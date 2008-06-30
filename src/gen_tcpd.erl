@@ -67,10 +67,16 @@ acceptor(Socket, Callback) ->
 	end)}.
 
 acceptor_loop(Parent, Socket, {Callback, CallbackArgs}) ->
-	{ok, CallbackState} = Callback:init(CallbackArgs),
-	{ok, Client} = accept(Socket),
-	gen_server:cast(Parent, {spawn_acceptor, self()}),
-	Callback:handle_connection(Client, CallbackState).
+	case Callback:init(CallbackArgs) of
+		{ok, CallbackState} ->
+			{ok, Client} = accept(Socket),
+			gen_server:cast(Parent, {spawn_acceptor, self()}),
+			unlink(Parent),
+			% FIXME Hey, no one is supervising this process!
+			Callback:handle_connection(Client, CallbackState);
+		Other ->
+			exit({bad_return, Other})
+	end.
 
 listen(Mod, Port, Options) ->
 	case Mod:listen(Port, Options) of
