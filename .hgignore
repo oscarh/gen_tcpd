@@ -3,3 +3,4 @@ syntax: glob
 ebin/*
 *.swp
 *.swo
+depend
