@@ -1,10 +1,13 @@
 -module(gen_tcpd).
+-behaviour(gen_server).
+
 -export([start_link/5]).
 -export([send/2, recv/3, close/1]).
 -export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 -export([code_change/3]).
 -export([acceptor_loop/3]).
+-export([behaviour_info/1]).
 
 -record(state, {callback, acceptor, socket}).
 
@@ -29,7 +32,7 @@ init([Type, Callback, Port, Options]) ->
 	process_flag(trap_exit, true),
 	{ok, Socket} = listen(Type, Port, Options),
 	{ok, Acceptor} = acceptor(Socket, Callback),
-	{ok, #state{callback = Callback, socket = Socket, acceptor =  Acceptor}}.
+	{ok, #state{callback = Callback, socket = Socket, acceptor = Acceptor}}.
 
 handle_call(_, _From, State) ->
 	{reply, ok, State}.
@@ -67,7 +70,7 @@ acceptor_loop(Parent, Socket, {Callback, CallbackArgs}) ->
 	{ok, CallbackState} = Callback:init(CallbackArgs),
 	{ok, Client} = accept(Socket),
 	gen_server:cast(Parent, {spawn_acceptor, self()}),
-	Callback:handle_request(Client, CallbackState).
+	Callback:handle_connection(Client, CallbackState).
 
 listen(Mod, Port, Options) ->
 	case Mod:listen(Port, Options) of
@@ -80,3 +83,8 @@ accept({Mod, Socket}) ->
 		{ok, Client} -> {ok, {Mod, Client}};
 		Error        -> Error
 	end.
+
+behaviour_info(callbacks) ->
+	[{init, 1}, {handle_connection, 2}];
+behaviour_info(_) ->
+	ok.
