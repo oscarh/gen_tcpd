@@ -1,5 +1,6 @@
 -module(gen_tcpd).
--export([start_link/4]).
+-export([start_link/5]).
+-export([send/2, recv/3, close/1]).
 -export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 -export([code_change/3]).
@@ -7,19 +8,33 @@
 
 -record(state, {callback, acceptor, socket}).
 
-start_link(Callback, CallbackArgs, Port, Options) ->
-	gen_server:start_link(?MODULE, [{Callback, CallbackArgs}, Port, Options], []).
+start_link(Callback, CallbackArgs, tcp, Port, Options) ->
+	gen_server:start_link(?MODULE, 
+		[gen_tcp, {Callback, CallbackArgs}, Port, Options], []);
+start_link(Callback, CallbackArgs, ssl, Port, Options) ->
+	gen_server:start_link(?MODULE, 
+		[ssl, {Callback, CallbackArgs}, Port, Options], []).
 
-init([Callback, Port, Options]) ->
+
+recv({Mod, Socket}, Size, Timeout) ->
+	Mod:recv(Socket, Size, Timeout).
+
+send({Mod, Socket}, Packet) ->
+	Mod:send(Socket, Packet).
+
+close({Mod, Socket}) ->
+	Mod:close(Socket).
+
+init([Type, Callback, Port, Options]) ->
 	process_flag(trap_exit, true),
-	{ok, Socket} = gen_tcp:listen(Port, Options),
+	{ok, Socket} = listen(Type, Port, Options),
 	{ok, Acceptor} = acceptor(Socket, Callback),
 	{ok, #state{callback = Callback, socket = Socket, acceptor =  Acceptor}}.
 
 handle_call(_, _From, State) ->
 	{reply, ok, State}.
 
-handle_cast({spaw_acceptor, Pid}, State) when Pid == State#state.acceptor ->
+handle_cast({spawn_acceptor, Pid}, State) when Pid == State#state.acceptor ->
 	{ok, Acceptor} = acceptor(State#state.socket, State#state.callback),
 	{noreply, State#state{acceptor = Acceptor}};
 handle_cast(_, State) ->
@@ -34,7 +49,7 @@ handle_info(_, State) ->
 	{noreply, State}.
 
 terminate(_, State) ->
-	gen_tcp:close(State#state.socket),
+	close(State#state.socket),
 	ok.
 code_change(_, _, State) ->
 	{ok, State}.
@@ -50,6 +65,18 @@ acceptor(Socket, Callback) ->
 
 acceptor_loop(Parent, Socket, {Callback, CallbackArgs}) ->
 	{ok, CallbackState} = Callback:init(CallbackArgs),
-	{ok, Client} = gen_tcp:accept(Socket),
-	gen_server:cast(Parent, {spaw_acceptor, self()}),
+	{ok, Client} = accept(Socket),
+	gen_server:cast(Parent, {spawn_acceptor, self()}),
 	Callback:handle_request(Client, CallbackState).
+
+listen(Mod, Port, Options) ->
+	case Mod:listen(Port, Options) of
+		{ok, Socket} -> {ok, {Mod, Socket}};
+		Error        -> Error
+	end.
+
+accept({Mod, Socket}) ->
+	case Mod:accept(Socket) of
+		{ok, Client} -> {ok, {Mod, Client}};
+		Error        -> Error
+	end.

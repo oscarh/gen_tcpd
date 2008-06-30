@@ -18,11 +18,11 @@ MODS = $(BEAMS:.beam=)
 APP = $(APPSRC:.app.src=.app)
 
 ## Dependecy Search Paths
-VPATH = src:ebin
+VPATH = src:include:ebin
 
-all: $(APP) $(BEAMS)
+all: depend $(BEAMS) $(APP) c_src
 
-.PHONY: all clean
+.PHONY: all clean c_src
 .SUFFIXES: .erl .beam .app.src .app
 
 clean: 
@@ -30,6 +30,11 @@ clean:
 		echo [RM] $$i; \
 		$(RM) $$i; \
 	done
+	@echo [RM] depend
+	@$(RM) depend
+	@if test -d c_src ; then \
+		$(MAKE) -C c_src clean; \
+	fi
 
 %.beam: %.erl
 	@echo [ERLC] $<
@@ -43,9 +48,12 @@ $(APP): $(APPSRC)
 	@$(SED) "s|%MODULES%|`echo $(MODS) | tr '[:blank:]' ','`|g" $< | \
 	$(SED) "s|%VSN%|$(VSN)|g" > ebin/$@
 
-$(BEAMS): $(ERLS)
+sinclude depend
+depend: $(ERLS)
+	@(sh erldep src)
 
-#sinclude depend
-#depend: $(ERLS)
-#	@(shell sh erldep src)
+c_src:
+	@if test -d c_src ; then \
+		$(MAKE) -C c_src; \
+	fi
 
