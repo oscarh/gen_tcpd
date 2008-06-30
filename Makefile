@@ -43,7 +43,7 @@ clean:
 		-DREV=$(REV) \
 		$(patsubst %,-pa $(TOP_DIR)/%/ebin, $(EDEPS)) $<
 
-$(APP): $(APPSRC) 
+$(APP): $(APPSRC) vsn.mk
 	@echo [SED] $<
 	@$(SED) "s|%MODULES%|`echo $(MODS) | tr '[:blank:]' ','`|g" $< | \
 	$(SED) "s|%VSN%|$(VSN)|g" > ebin/$@
