@@ -31,7 +31,6 @@ controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
 init([Type, {Mod, Args}, Port, Options]) ->
-	process_flag(trap_exit, true),
 	{ok, CState} = Mod:init(Args),
 	{ok, Socket} = listen(Type, Port, Options),
 	{ok, Acceptor} = acceptor(Socket),
@@ -49,9 +48,6 @@ handle_call({new_connection, Socket}, _From, State) ->
 handle_cast(_, State) ->
 	{noreply, State}.
 
-handle_info({'EXIT', Pid, _}, State) when Pid == State#state.acceptor ->
-	{ok, Acceptor} = acceptor(State#state.socket),
-	{noreply, State#state{acceptor = Acceptor}};
 handle_info(Info, #state{callback = {CMod, CState}} = State) ->
 	{noreply, CState0} = CMod:handle_info(Info, CState),
 	{noreply, State#state{callback = {CMod, CState0}}}.
