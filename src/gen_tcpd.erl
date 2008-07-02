@@ -2,7 +2,15 @@
 -behaviour(gen_server).
 
 -export([start_link/5]).
--export([send/2, recv/3, close/1, controlling_process/2]).
+-export([
+		send/2,
+		recv/3,
+		close/1,
+		controlling_process/2,
+		peername/1,
+		sockname/1,
+		type/1
+	]).
 -export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 -export([code_change/3]).
@@ -24,8 +32,21 @@ recv({Mod, Socket}, Size, Timeout) ->
 send({Mod, Socket}, Packet) ->
 	Mod:send(Socket, Packet).
 
-close({Mod, Socket}) ->
-	Mod:close(Socket).
+close({_, Socket}) ->
+	inet:close(Socket).
+
+peername({_, Socket}) ->
+	inet:peername(Socket).
+
+sockname({_, Socket}) ->
+	inet:sockname(Socket).
+
+type({gen_tcp, _}) ->
+	tcp;
+type({ssl, _}) ->
+	ssl;
+type(_) ->
+	exit(badarg).
 
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
