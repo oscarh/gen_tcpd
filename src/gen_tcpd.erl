@@ -84,8 +84,12 @@ handle_cast(_, State) ->
 handle_info({'EXIT', Acceptor, Reason}, #state{acceptor = Acceptor}) ->
 	exit(Reason); % to preserve original behaviuor if someone traps exits
 handle_info(Info, #state{callback = {CMod, CState}} = State) ->
-	{noreply, CState0} = CMod:handle_info(Info, CState),
-	{noreply, State#state{callback = {CMod, CState0}}}.
+	case CMod:handle_info(Info, CState) of
+		{noreply, CState0} ->
+			{noreply, State#state{callback = {CMod, CState0}}};
+		Other ->
+			exit({invalid_return_value, Other})
+	end.
 
 terminate(Reason, #state{callback = {CMod, CState}} = State) ->
 	close(State#state.socket),
