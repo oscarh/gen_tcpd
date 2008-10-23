@@ -81,6 +81,8 @@ handle_call({new_connection, Socket}, _From, State) ->
 handle_cast(_, State) ->
 	{noreply, State}.
 
+handle_info({'EXIT', Acceptor, Reason}, #state{acceptor = Acceptor}) ->
+	exit(Reason); % to preserve original behaviuor if someone traps exits
 handle_info(Info, #state{callback = {CMod, CState}} = State) ->
 	{noreply, CState0} = CMod:handle_info(Info, CState),
 	{noreply, State#state{callback = {CMod, CState0}}}.
@@ -99,7 +101,7 @@ acceptor(Socket) ->
 safe_acceptor_loop(Parent, Socket) ->
 	case catch acceptor_loop(Parent, Socket) of
 		%% Prevent SASL error reports...
-		{'EXIT', Reason} -> exit(Reason);
+		{'EXIT', Reason} -> exit({accept_error, Reason});
 		_                -> ok % The acceptor loop should never return
 	end.
 
