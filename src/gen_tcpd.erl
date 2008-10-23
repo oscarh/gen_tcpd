@@ -14,7 +14,7 @@
 -export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 -export([code_change/3]).
--export([acceptor_loop/2]).
+-export([safe_acceptor_loop/2]).
 -export([behaviour_info/1]).
 
 -record(state, {callback, acceptor, socket}).
@@ -71,7 +71,7 @@ handle_call({new_connection, Socket}, _From, State) ->
 		{noreply, CState0} ->
 			{reply, noreply, State#state{callback = {CMod, CState0}}};
 		{stop, Reason, CState0} ->
-			{stop, Reason, CState0}
+			{stop, Reason, stop, State#state{callback = {CMod, CState0}}}
 	end.
 
 handle_cast(_, State) ->
@@ -81,29 +81,23 @@ handle_info(Info, #state{callback = {CMod, CState}} = State) ->
 	{noreply, CState0} = CMod:handle_info(Info, CState),
 	{noreply, State#state{callback = {CMod, CState0}}}.
 
-terminate(Reason, #state{callback = {CM, CS}, acceptor = A} = State) ->
-	case is_process_alive(A) of
-		true ->
-			unlink(A),
-			exit(A);
-		false ->
-			ok
-	end,
+terminate(Reason, #state{callback = {CMod, CState}} = State) ->
 	close(State#state.socket),
-	CM:terminate(Reason, CS).
+	CMod:terminate(Reason, CState).
 
 code_change(_, _, State) ->
 	{ok, State}.
 
 acceptor(Socket) ->
 	Parent = self(),
-	{ok, spawn_link(fun() -> 
-		case catch ?MODULE:acceptor_loop(Parent, Socket) of
-			%% Prevent SASL error reports...
-			{'EXIT', Reason} -> exit(Reason); 
-			Result           -> Result
-		end
-	end)}.
+	{ok, spawn_link(?MODULE, safe_acceptor_loop, [Parent, Socket])}.
+
+safe_acceptor_loop(Parent, Socket) ->
+	case catch acceptor_loop(Parent, Socket) of
+		%% Prevent SASL error reports...
+		{'EXIT', Reason} -> exit(Reason);
+		_                -> ok % The acceptor loop should never return
+	end.
 
 acceptor_loop(Parent, Socket) ->
 	{ok, Client} = accept(Socket),
