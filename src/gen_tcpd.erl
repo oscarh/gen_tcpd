@@ -56,14 +56,18 @@ controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
 init([Type, {Mod, Args}, Port, Options]) ->
-	{ok, CState} = Mod:init(Args),
-	{ok, Socket} = listen(Type, Port, Options),
-	{ok, Acceptor} = acceptor(Socket),
-	{ok, #state{
-		callback = {Mod, CState}, 
-		socket = Socket,
-		acceptor = Acceptor
-	}}.
+	case Mod:init(Args) of
+		{ok, CState} ->
+			{ok, Socket} = listen(Type, Port, Options),
+			{ok, Acceptor} = acceptor(Socket),
+			{ok, #state{
+				callback = {Mod, CState}, 
+				socket = Socket,
+				acceptor = Acceptor
+			}};
+		Other ->
+			Other
+	end.
 
 handle_call({new_connection, Socket}, _From, State) ->
 	{CMod, CState} = State#state.callback,
