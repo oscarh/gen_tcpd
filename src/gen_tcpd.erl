@@ -32,12 +32,16 @@ recv({Mod, Socket}, Size, Timeout) ->
 send({Mod, Socket}, Packet) ->
 	Mod:send(Socket, Packet).
 
-close({_, Socket}) ->
-	inet:close(Socket).
+close({Mod, Socket}) ->
+	Mod:close(Socket).
 
+peername({ssl, Socket}) ->
+	ssl:peername(Socket);
 peername({_, Socket}) ->
 	inet:peername(Socket).
 
+sockname({ssl, Socket}) ->
+	ssl:sockname(Socket);
 sockname({_, Socket}) ->
 	inet:sockname(Socket).
 
@@ -63,8 +67,12 @@ init([Type, {Mod, Args}, Port, Options]) ->
 
 handle_call({new_connection, Socket}, _From, State) ->
 	{CMod, CState} = State#state.callback,
-	{Reply, CState0} = CMod:handle_connection(Socket, CState),
-	{reply, Reply, State#state{callback = {CMod, CState0}}}.
+	case CMod:handle_connection(Socket, CState) of
+		{noreply, CState0} ->
+			{reply, noreply, State#state{callback = {CMod, CState0}}};
+		{stop, Reason, CState0} ->
+			{stop, Reason, CState0}
+	end.
 
 handle_cast(_, State) ->
 	{noreply, State}.
@@ -73,9 +81,16 @@ handle_info(Info, #state{callback = {CMod, CState}} = State) ->
 	{noreply, CState0} = CMod:handle_info(Info, CState),
 	{noreply, State#state{callback = {CMod, CState0}}}.
 
-terminate(Reason, #state{callback = {CMod, CState}} = State) ->
+terminate(Reason, #state{callback = {CM, CS}, acceptor = A} = State) ->
+	case is_process_alive(A) of
+		true ->
+			unlink(A),
+			exit(A);
+		false ->
+			ok
+	end,
 	close(State#state.socket),
-	CMod:terminate(Reason, CState).
+	CM:terminate(Reason, CS).
 
 code_change(_, _, State) ->
 	{ok, State}.
