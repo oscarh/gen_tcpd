@@ -35,15 +35,15 @@ send({Mod, Socket}, Packet) ->
 close({Mod, Socket}) ->
 	Mod:close(Socket).
 
-peername({ssl, Socket}) ->
-	ssl:peername(Socket);
-peername({_, Socket}) ->
-	inet:peername(Socket).
+peername({gen_tcp, Socket}) ->
+	inet:peername(Socket);
+peername({Mod, Socket}) ->
+	Mod:peername(Socket).
 
-sockname({ssl, Socket}) ->
-	ssl:sockname(Socket);
-sockname({_, Socket}) ->
-	inet:sockname(Socket).
+sockname({gen_tcp, Socket}) ->
+	inet:sockname(Socket);
+sockname({Mod, Socket}) ->
+	Mod:sockname(Socket).
 
 type({gen_tcp, _}) ->
 	tcp;
