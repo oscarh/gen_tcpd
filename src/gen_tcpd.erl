@@ -51,9 +51,14 @@
 		sockname/1,
 		type/1
 	]).
--export([init/1, terminate/2]).
--export([handle_call/3, handle_cast/2, handle_info/2]).
--export([code_change/3]).
+-export([
+		init/1,
+		handle_call/3,
+		handle_cast/2,
+		handle_info/2,
+		code_change/3,
+		terminate/2
+	]).
 -export([safe_acceptor_loop/2]).
 -export([behaviour_info/1]).
 
@@ -98,15 +103,22 @@ controlling_process({Mod, Socket}, Pid) ->
 init([Type, {Mod, Args}, Port, Options]) ->
 	case Mod:init(Args) of
 		{ok, CState} ->
-			{ok, Socket} = listen(Type, Port, Options),
-			{ok, Acceptor} = acceptor(Socket),
-			{ok, #state{
-				callback = {Mod, CState}, 
-				socket = Socket,
-				acceptor = Acceptor
-			}};
+			case listen(Type, Port, Options) of
+				{ok, Socket} ->
+					{ok, Acceptor} = acceptor(Socket),
+					{ok, #state{
+						callback = {Mod, CState}, 
+						socket = Socket,
+						acceptor = Acceptor
+					}};
+				{error, Reason} ->
+					{stop, Reason}
+			end;
+		{stop, Reason} ->
+			Mod:terminate(Reason, undefined),
+			{stop, Reason};
 		Other ->
-			Other
+			{stop, {invalid_return_value, Other}}
 	end.
 
 handle_call({new_connection, Socket}, _From, State) ->
@@ -142,6 +154,7 @@ acceptor(Socket) ->
 	Parent = self(),
 	{ok, spawn_link(?MODULE, safe_acceptor_loop, [Parent, Socket])}.
 
+%% @hidden
 safe_acceptor_loop(Parent, Socket) ->
 	case catch acceptor_loop(Parent, Socket) of
 		%% Prevent SASL error reports...
@@ -171,6 +184,7 @@ accept({Mod, Socket}) ->
 		Error        -> Error
 	end.
 
+%% @hidden
 behaviour_info(callbacks) ->
 	[{init, 1}, {handle_connection, 2}, {handle_info, 2}, {terminate, 2}];
 behaviour_info(_) ->
