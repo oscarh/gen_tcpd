@@ -1,0 +1,38 @@
+@copyright 2008 Martin Carlson, Oscar Hellström
+@author Martin Carlson <martin@erlang-consulting.com>
+@author Oscar Hellström <oscar@hellstrom.st> [http://oscar.hellstrom.st]
+@version {@version}, {@date}, {@time}
+
+@doc gen_tcpd is an erlang behaviour for TCP accept loops.
+gen_tcpd lets you implement a tcp server with lots of flexibility, but takes
+care of dealing with accepting new connections and delivers them using a
+callback. Since gen_tcpd is an OTP behaviour your module will be put under a
+supervisor and will integrate naturally in any OTP application.
+
+== Examples ==
+
+Accept TCP connections, send a HELO message and close the socket:
+<pre>
+-module(tcpd_test).
+-behaviour(gen_tcpd).
+
+-export([start_link/0]).
+-export([init/1, handle_connection/2, handle_info/2, terminate/2]).
+
+start_link() ->
+	gen_tcpd:start_link(?MODULE, [], tcp, 10101, []).
+
+init(_Args) ->
+	{ok, nil}.
+
+handle_connection(Socket, State) ->
+	gen_tcpd:send(Socket, "HELO\n"),
+	gen_tcpd:close(Socket),
+	{noreply, State}.
+
+handle_info(_Info, State) ->
+	{noreply, State}.
+
+terminate(_Reason, _State) ->
+	ok.
+</pre>

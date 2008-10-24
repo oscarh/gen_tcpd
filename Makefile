@@ -20,10 +20,15 @@ APP = $(APPSRC:.app.src=.app)
 ## Dependecy Search Paths
 VPATH = src:include:ebin
 
+
+.PHONY: all clean c_src doc
+.SUFFIXES: .erl .beam .app.src .app
+
 all: depend $(BEAMS) $(APP) c_src
 
-.PHONY: all clean c_src
-.SUFFIXES: .erl .beam .app.src .app
+doc: 
+	@echo [EDOC] gen_tcpd
+	@erl -noinput -eval 'edoc:application(gen_tcpd, "./", [{doc, "doc/"}])' -s erlang halt
 
 clean: 
 	@for i in $(wildcard ebin/*); do \
@@ -35,6 +40,8 @@ clean:
 	@if test -d c_src ; then \
 		$(MAKE) -C c_src clean; \
 	fi
+	@echo [RM] doc/
+	@$(RM) doc/*.html doc/*.css doc/*.jpg doc/edoc-info doc/*.png
 
 %.beam: %.erl
 	@echo [ERLC] $<
