@@ -103,6 +103,7 @@
 -export([start_link/5]).
 -export([
 		send/2,
+		recv/2,
 		recv/3,
 		close/1,
 		controlling_process/2,
@@ -144,6 +145,15 @@ start_link(Callback, CallbackArg, tcp, Port, Options) ->
 start_link(Callback, CallbackArg, ssl, Port, Options) ->
 	gen_server:start_link(?MODULE, 
 		[ssl, {Callback, CallbackArg}, Port, Options], []).
+
+%% @spec recv(Socket::socket(), Size::integer()) -> Result
+%% Result = {ok, Packet} | {error, Reason}
+%% Reason = {error, timeout} | {error, posix()}
+%% @doc Tries to read <code>Size</code> octets of data from
+%% <code>Socket</code>. <code>Size</code> is only relevant if the socket is in
+%% raw format.
+recv({Mod, Socket}, Size) ->
+	Mod:recv(Socket, Size).
 
 %% @spec recv(Socket::socket(), Size::integer(), Timeout::integer()) -> Result
 %% Result = {ok, Packet} | {error, Reason}
