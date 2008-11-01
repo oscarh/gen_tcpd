@@ -1,5 +1,9 @@
 syntax: glob
 
+doc/*.html
+doc/*.png
+doc/*.css
+doc/edoc-info
 ebin/*
 *.swp
 *.swo
