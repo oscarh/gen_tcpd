@@ -1,6 +1,6 @@
 %%% ----------------------------------------------------------------------------
 %%% Copyright 2008
-%%% Martin Carlson, martin@erlang-consulting.com
+%%% Martin Carlson, martin@martinc.eu
 %%% Oscar Hellström, oscar@hellstrom.st
 %%%
 %%% All rights reserved
@@ -31,7 +31,7 @@
 %%% SUCH DAMAGE.
 %%% ----------------------------------------------------------------------------
 %%% @copyright 2008 Martin Carlson, Oscar Hellström
-%%% @author Martin Carlson <martin@erlang-consulting.com>
+%%% @author Martin Carlson <martin@martinc.eu>
 %%% @author Oscar Hellström <oscar@hellstrom.st> [http://oscar.hellstrom.st]
 %%% @version {@version}, {@date}, {@time}
 %%% @doc
