@@ -4,7 +4,7 @@
 ERLC ?= erlc
 EFLAGS ?= -Wall
 
-EDEPS=air xmlrpc caclib
+EDEPS=
 
 ## Revision Macro TAG
 REV ?= $(shell hg identify -n -i|awk '{print "\\\""$$2":"$$1"\\\""};')
