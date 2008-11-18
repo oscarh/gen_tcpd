@@ -107,6 +107,7 @@
 		recv/3,
 		close/1,
 		peername/1,
+		port/1,
 		sockname/1,
 		setopts/2,
 		controlling_process/2,
@@ -146,6 +147,19 @@ start_link(Callback, CallbackArg, tcp, Port, Options) ->
 start_link(Callback, CallbackArg, ssl, Port, Options) ->
 	gen_server:start_link(?MODULE, 
 		[ssl, {Callback, CallbackArg}, Port, Options], []).
+
+%% @spec port(Ref) -> Port::integer()
+%% Ref = Name | {Name, Node} | {global, GlobalName} | pid()
+%% Name = atom()
+%% Node = atom()
+%% GlobalName = term()
+%% @doc
+%% Returns the listening port for the gen_tcpd.
+%% This is useful if gen server was called with <code>Port</code> =
+%% <code>0</code>.
+%% @end
+port(Ref) ->
+	gen_server:call(Ref, port).
 
 %% @spec recv(Socket::socket(), Size::integer()) -> Result
 %% Result = {ok, Packet} | {error, Reason}
@@ -256,7 +270,9 @@ handle_call({new_connection, Socket}, _From, State) ->
 			{reply, noreply, State#state{callback = {CMod, CState0}}};
 		{stop, Reason, CState0} ->
 			{stop, Reason, stop, State#state{callback = {CMod, CState0}}}
-	end.
+	end;
+handle_call(port, _, #state{socket = Socket} = State) ->
+	{reply, sock_port(Socket), State}.
 
 %% @hidden
 handle_cast(_, State) ->
@@ -307,15 +323,20 @@ acceptor_loop(Parent, Socket) ->
 
 listen(Mod, Port, Options) ->
 	case Mod:listen(Port, Options) of
-		{ok, Socket} -> {ok, {Mod, Socket}};
-		Error        -> Error
+		{ok, Socket}    -> {ok, {Mod, Socket}};
+		{error, Reason} -> {error, {Mod, listen}, Reason}
 	end.
 
 accept({Mod, Socket}) ->
 	case Mod:accept(Socket) of
-		{ok, Client} -> {ok, {Mod, Client}};
-		Error        -> Error
+		{ok, Client}    -> {ok, {Mod, Client}};
+		{error, Reason} -> {error, {Mod, accept}, Reason}
 	end.
+
+sock_port({gen_tcp, Socket}) ->
+	inet:port(Socket);
+sock_port({Mod, Socket}) ->
+	Mod:port(Socket).
 
 %% @hidden
 behaviour_info(callbacks) ->
