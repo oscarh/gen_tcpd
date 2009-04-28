@@ -111,7 +111,8 @@
 		sockname/1,
 		setopts/2,
 		controlling_process/2,
-		type/1
+		type/1,
+		stop/1
 	]).
 -export([
 		init/1,
@@ -160,6 +161,17 @@ start_link(Callback, CallbackArg, ssl, Port, Options) ->
 %% @end
 port(Ref) ->
 	gen_server:call(Ref, port).
+
+%% @spec stop(Ref) -> ok
+%% Ref = Name | {Name, Node} | {global, GlobalName} | pid()
+%% Name = atom()
+%% Node = atom()
+%% GlobalName = term()
+%% @doc
+%% Stops the gen_tcpd server and frees the listening port.
+%% @end
+stop(Ref) ->
+	gen_server:cast(Ref, stop).
 
 %% @spec recv(Socket::socket(), Size::integer()) -> Result
 %% Result = {ok, Packet} | {error, Reason}
@@ -272,9 +284,14 @@ handle_call({new_connection, Socket}, _From, State) ->
 			{stop, Reason, stop, State#state{callback = {CMod, CState0}}}
 	end;
 handle_call(port, _, #state{socket = Socket} = State) ->
-	{reply, sock_port(Socket), State}.
+	{reply, sock_port(Socket), State};
+handle_call(Request, _, State) ->
+	{reply, {error, {bad_request, Request}}, State}.
+
 
 %% @hidden
+handle_cast(stop, State) ->
+	{stop, normal, State};
 handle_cast(_, State) ->
 	{noreply, State}.
 
@@ -334,9 +351,9 @@ accept({Mod, Socket}) ->
 	end.
 
 sock_port({gen_tcp, Socket}) ->
-	inet:port(Socket);
+	element(2, inet:port(Socket));
 sock_port({Mod, Socket}) ->
-	Mod:port(Socket).
+	element(2, Mod:port(Socket)).
 
 %% @hidden
 behaviour_info(callbacks) ->
