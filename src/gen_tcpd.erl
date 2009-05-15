@@ -344,7 +344,6 @@ init_acceptor(Parent, Callback, CState, Socket) ->
 accept(Parent, Callback, CState, Socket) ->
 	case do_accept(Socket) of
 		{ok, Client} ->
-			gen_server:call(Parent, {accepted, self()}),
 			Args = [Parent, Callback, CState, Socket],
 			spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
