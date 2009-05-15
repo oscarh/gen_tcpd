@@ -54,31 +54,34 @@
 %%%           Result = {ok, State} | {stop, Reason}
 %%% </pre>
 %%% After {@link start_link/5} has been called this function
-%%% is called by the new to initialise a state. If the the initialisation is
+%%% is called by the new to initialise a state. If the initialisation is
 %%% successful the function should return <code>{ok, State}</code> where
 %%% <code>State</code> is the state which will be passed to the client in
 %%% in the next callback. <code>Args</code> is the <code>Args</code> passed
 %%% to {@link start_link/5}.
 %%%
 %%% <pre>
-%%% Module:handle_connection(Socket, State) -> Result
+%%% Module:handle_connection(Socket, State) -> void()
 %%%     Types Socket = {@link socket()}
 %%%           State = term()
-%%%           Result = {noreply, NewState} | {stop, Reason, NewState}
 %%% </pre>
-%%% When a TCP connection is received from a client, this function is
-%%% called. No other TCP connection can be accepted before this function has
-%%% returned, but they can be backlogged. If the socket should be controlled
-%%% by anoother process, give away control by {@link controlling_process/2}.
+%%% When a TCP / SSL connection is accepted,
+%%% `Module:handle_connection(Socket, State)' will be called from a new
+%%% process. This process should handle the TCP connection and do whatever
+%%% it wants to. When this function returns, the process exits.
 %%%
-%%% If <code>Result</code> is <code>{noreply, NewState}</code> the server
-%%% will wait for another connection. <code>NewState</code> is the possibly
-%%% updated internal state. If <code>Result</code> is <code>{stop, Reason,
-%%% NewState}</code> the server will exit with <code>Reason</code>, after
-%%% calling <code>Module:terminate(Reason, NewState)</code>.
+%%% The process which this is called from is linked to the `gen_tcpd'
+%%% process. It is allowed to trap exits in the `gen_tcpd' process if
+%%% this is wanted. It's also possible to pass the `gen_tcpd' process as
+%%% part of the `State' argument to unlink from it.
+%%%
+%%% It might seem strange that the process is not under some individual
+%%% supervisor, but it has been shown that starting children under
+%%% supervisors in a vary rapid pace can overload a supervisor and become a
+%%% bottleneck in accepting connections.
 %%%
 %%% <pre>
-%%% Module:handle_info(Info, State) -> Result
+%%% Module:handle_info(Info, State) -> noreply
 %%%     Types Info = term()
 %%%           State = term()
 %%% </pre>
@@ -100,7 +103,7 @@
 -module(gen_tcpd).
 -behaviour(gen_server).
 
--export([start_link/5]).
+-export([start_link/5, start_link/6]).
 -export([
 		send/2,
 		recv/2,
@@ -122,32 +125,51 @@
 		code_change/3,
 		terminate/2
 	]).
--export([safe_acceptor_loop/2]).
+-export([init_acceptor/4]).
 -export([behaviour_info/1]).
 
--record(state, {callback, acceptor, socket}).
+-record(state, {callback, acceptors, socket}).
 
-%% @spec start_link(Callback, CallbackArg, Type, Port, Options) -> {ok, Pid}
+%% @spec start_link(Callback, CallbackArg, Type, Port, ListenOptions) -> {ok, Pid}
 %% Callback = atom()
 %% CallbackArg = term()
 %% Type = tcp | ssl
 %% Port = integer()
-%% Options = [Opt]
+%% ListenOptions = [Opt]
+%% Pid = pid()
+%% @doc Starts a gen_tcpd process and links to it.
+%% Same as calling `start_link(Callback, CallbackArg, Type, Port, 1,
+%% ListenOptions)'.
+start_link(Callback, CallbackArg, Type, Port, ListenOptions) ->
+	start_link(Callback, CallbackArg, Type, Port, 1, ListenOptions).
+
+%% @spec start_link(Callback, CallbackArg, Type, Port, Acceptors,
+%%                 ListenOptions) ->
+%%        {ok, Pid}
+%% Callback = atom()
+%% CallbackArg = term()
+%% Type = tcp | ssl
+%% Port = integer()
+%% Acceptors = integer()
+%% ListenOptions = [Opt]
 %% Pid = pid()
 %% @doc Starts a gen_tcpd process and links to it.
 %% <code>Callback</code> is the module that implements the specific parts of
 %% the behaivour. <code>CallbackArg</code> is the arguments that will be
 %% passed to <code>Module:init/1</code>. <code>Type</code> defines what type
 %% of socket the server should use. <code>Port</code> is the TCP port that
-%% the server will listen on. <code>Options</code> will
+%% the server will listen on. `Acceptors' is the number of concurrent
+%% processes that should call `accept/1'. <code>ListenOptions</code> will
 %% be passed to the backend module for setting up the socket.
 %% This function should normally be called from a supervisor.
-start_link(Callback, CallbackArg, tcp, Port, Options) ->
-	gen_server:start_link(?MODULE, 
-		[gen_tcp, {Callback, CallbackArg}, Port, Options], []);
-start_link(Callback, CallbackArg, ssl, Port, Options) ->
-	gen_server:start_link(?MODULE, 
-		[ssl, {Callback, CallbackArg}, Port, Options], []).
+start_link(Callback, CallbackArg, tcp, Port, Acceptors, ListenOptions)
+	                                                    when Acceptors > 0 ->
+	Args = [gen_tcp, {Callback, CallbackArg}, Port, Acceptors, ListenOptions],
+	gen_server:start_link(?MODULE, Args, []);
+start_link(Callback, CallbackArg, ssl, Port, Acceptors, ListenOptions)
+	                                                    when Acceptors > 0 ->
+	Args = [ssl, {Callback, CallbackArg}, Port, Acceptors, ListenOptions],
+	gen_server:start_link(?MODULE, Args, []).
 
 %% @spec port(Ref) -> Port::integer()
 %% Ref = Name | {Name, Node} | {global, GlobalName} | pid()
@@ -243,26 +265,25 @@ type(_) ->
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
-%% @spec setopts(Socket::socket(), Options) -> ok | {error, Reason}
+%% @spec setopts(Socket::socket(), ListenOptions) -> ok | {error, Reason}
 %% Reason = posix()
 %% @doc Sets options for a socket.
 %% See backend modules for more info.
-setopts({gen_tcp, Socket}, Options) ->
-	inet:setopts(Socket, Options);
-setopts({Mod, Socket}, Options) ->
-	Mod:setopts(Socket, Options).
+setopts({gen_tcp, Socket}, ListenOptions) ->
+	inet:setopts(Socket, ListenOptions);
+setopts({Mod, Socket}, ListenOptions) ->
+	Mod:setopts(Socket, ListenOptions).
 
 %% @hidden
-init([Type, {Mod, Args}, Port, Options]) ->
+init([Type, {Mod, Args}, Port, Acceptors, ListenOptions]) ->
 	case Mod:init(Args) of
 		{ok, CState} ->
-			case listen(Type, Port, Options) of
+			case listen(Type, Port, ListenOptions) of
 				{ok, Socket} ->
-					{ok, Acceptor} = acceptor(Socket),
+					start_acceptors(Acceptors, Mod, CState, Socket),
 					{ok, #state{
-						callback = {Mod, CState}, 
-						socket = Socket,
-						acceptor = Acceptor
+						callback = {Mod, CState},
+						socket = Socket
 					}};
 				{error, Reason} ->
 					{stop, Reason}
@@ -275,14 +296,6 @@ init([Type, {Mod, Args}, Port, Options]) ->
 	end.
 
 %% @hidden
-handle_call({new_connection, Socket}, _From, State) ->
-	{CMod, CState} = State#state.callback,
-	case CMod:handle_connection(Socket, CState) of
-		{noreply, CState0} ->
-			{reply, noreply, State#state{callback = {CMod, CState0}}};
-		{stop, Reason, CState0} ->
-			{stop, Reason, stop, State#state{callback = {CMod, CState0}}}
-	end;
 handle_call(port, _, #state{socket = Socket} = State) ->
 	{reply, sock_port(Socket), State};
 handle_call(Request, _, State) ->
@@ -296,12 +309,13 @@ handle_cast(_, State) ->
 	{noreply, State}.
 
 %% @hidden
-handle_info({'EXIT', Acceptor, Reason}, #state{acceptor = Acceptor}) ->
-	exit(Reason); % to preserve original behaviuor if someone traps exits
-handle_info(Info, #state{callback = {CMod, CState}} = State) ->
+handle_info(Info, State) ->
+	{CMod, CState} = State#state.callback,
 	case CMod:handle_info(Info, CState) of
-		{noreply, CState0} ->
-			{noreply, State#state{callback = {CMod, CState0}}};
+		noreply ->
+			{noreply, State};
+		{stop, Reason} ->
+			{stop, Reason, State};
 		Other ->
 			exit({invalid_return_value, Other})
 	end.
@@ -316,26 +330,29 @@ code_change(_, _, State) ->
 	{ok, State}.
 
 %% @private
-acceptor(Socket) ->
-	Parent = self(),
-	{ok, spawn_link(?MODULE, safe_acceptor_loop, [Parent, Socket])}.
+start_acceptors(0, _, _, _) ->
+	ok;
+start_acceptors(Acceptors, Callback, CState, Socket) ->
+	spawn(?MODULE, init_acceptor, [self(), Callback, CState, Socket]),
+	start_acceptors(Acceptors - 1, Callback, CState, Socket).
 
 %% @hidden
-safe_acceptor_loop(Parent, Socket) ->
-	case catch acceptor_loop(Parent, Socket) of
-		%% Prevent SASL error reports...
-		{'EXIT', Reason} -> exit({accept_error, Reason});
-		_                -> ok % The acceptor loop should never return
-	end.
+init_acceptor(Parent, Callback, CState, Socket) ->
+	link(Parent),
+	accept(Parent, Callback, CState, Socket).
 
-acceptor_loop(Parent, Socket) ->
-	{ok, Client} = accept(Socket),
-	ok = controlling_process(Client, Parent),
-	case gen_server:call(Parent, {new_connection, Client}) of
-		noreply ->
-			acceptor_loop(Parent, Socket);
-		stop ->
-			exit(normal)
+accept(Parent, Callback, CState, Socket) ->
+	case do_accept(Socket) of
+		{ok, Client} ->
+			gen_server:call(Parent, {accepted, self()}),
+			Args = [Parent, Callback, CState, Socket],
+			spawn(?MODULE, init_acceptor, Args),
+			Callback:handle_connection(Client, CState);
+		{error, closed} ->
+			unlink(Parent), % no need to send exit signals here
+			exit(normal);
+		Other ->
+			exit(Other)
 	end.
 
 listen(Mod, Port, Options) ->
@@ -344,7 +361,7 @@ listen(Mod, Port, Options) ->
 		{error, Reason} -> {error, {Mod, listen}, Reason}
 	end.
 
-accept({Mod, Socket}) ->
+do_accept({Mod, Socket}) ->
 	case Mod:accept(Socket) of
 		{ok, Client}    -> {ok, {Mod, Client}};
 		{error, Reason} -> {error, {Mod, accept}, Reason}
