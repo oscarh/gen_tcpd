@@ -351,19 +351,19 @@ accept(Parent, Callback, CState, Socket) ->
 			unlink(Parent), % no need to send exit signals here
 			exit(normal);
 		Other ->
-			exit(Other)
+			erlang:error(Other)
 	end.
 
 listen(Mod, Port, Options) ->
 	case Mod:listen(Port, Options) of
 		{ok, Socket}    -> {ok, {Mod, Socket}};
-		{error, Reason} -> {error, {Mod, listen}, Reason}
+		{error, Reason} -> {error, {{Mod, listen}, Reason}}
 	end.
 
 do_accept({Mod, Socket}) ->
 	case Mod:accept(Socket) of
 		{ok, Client}    -> {ok, {Mod, Client}};
-		{error, Reason} -> {error, {Mod, accept}, Reason}
+		{error, Reason} -> {error, {{Mod, accept}, Reason}}
 	end.
 
 sock_port({gen_tcp, Socket}) ->
