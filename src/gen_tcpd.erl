@@ -377,7 +377,7 @@ accept(Parent, Callback, CState, Socket, Timeout) ->
 			Args = [Parent, Callback, CState, Socket, Timeout],
 			spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
-		{error, closed} ->
+		{error, {_, closed}} ->
 			unlink(Parent), % no need to send exit signals here
 			exit(normal);
 		Other ->
