@@ -53,12 +53,12 @@
 %%%     Types Args = term()
 %%%           Result = {ok, State} | {stop, Reason}
 %%% </pre>
-%%% After {@link start_link/5} has been called this function
+%%% After {@link start_link/5,6,7} has been called this function
 %%% is called by the new to initialise a state. If the initialisation is
 %%% successful the function should return <code>{ok, State}</code> where
 %%% <code>State</code> is the state which will be passed to the client in
 %%% in the next callback. <code>Args</code> is the <code>Args</code> passed
-%%% to {@link start_link/5}.
+%%% to {@link start_link/5}, {@link start_link/6} or {@link start_link/7}.
 %%%
 %%% <pre>
 %%% Module:handle_connection(Socket, State) -> void()
@@ -103,29 +103,29 @@
 -module(gen_tcpd).
 -behaviour(gen_server).
 
--export([start_link/5, start_link/6]).
+-export([start_link/5, start_link/6, start_link/7]).
 -export([
-		send/2,
-		recv/2,
-		recv/3,
-		close/1,
-		peername/1,
-		port/1,
-		sockname/1,
-		setopts/2,
-		controlling_process/2,
-		type/1,
-		stop/1
-	]).
+	send/2,
+	recv/2,
+	recv/3,
+	close/1,
+	peername/1,
+	port/1,
+	sockname/1,
+	setopts/2,
+	controlling_process/2,
+	type/1,
+	stop/1
+]).
 -export([
-		init/1,
-		handle_call/3,
-		handle_cast/2,
-		handle_info/2,
-		code_change/3,
-		terminate/2
-	]).
--export([init_acceptor/4]).
+	init/1,
+	handle_call/3,
+	handle_cast/2,
+	handle_info/2,
+	code_change/3,
+	terminate/2
+]).
+-export([init_acceptor/5]).
 -export([behaviour_info/1]).
 
 -record(state, {callback, acceptors, socket}).
@@ -141,7 +141,7 @@
 %% Same as calling `start_link(Callback, CallbackArg, Type, Port, 1,
 %% ListenOptions)'.
 start_link(Callback, CallbackArg, Type, Port, ListenOptions) ->
-	start_link(Callback, CallbackArg, Type, Port, 1, ListenOptions).
+	start_link(Callback, CallbackArg, Type, Port, 1, ListenOptions, infinity).
 
 %% @spec start_link(Callback, CallbackArg, Type, Port, Acceptors,
 %%                 ListenOptions) ->
@@ -162,13 +162,40 @@ start_link(Callback, CallbackArg, Type, Port, ListenOptions) ->
 %% processes that should call `accept/1'. <code>ListenOptions</code> will
 %% be passed to the backend module for setting up the socket.
 %% This function should normally be called from a supervisor.
-start_link(Callback, CallbackArg, tcp, Port, Acceptors, ListenOptions)
-	                                                    when Acceptors > 0 ->
-	Args = [gen_tcp, {Callback, CallbackArg}, Port, Acceptors, ListenOptions],
+start_link(Callback, CallbackArg, Type, Port, Acceptors,
+		ListenOptions) when Acceptors > 0 ->
+	start_link(Callback, CallbackArg, Type, Port, Acceptors,
+		ListenOptions, infinity).
+
+%% @spec start_link(Callback, CallbackArg, Type, Port, Acceptors,
+%%                 ListenOptions, AcceptTimeout) ->
+%%        {ok, Pid}
+%% Callback = atom()
+%% CallbackArg = term()
+%% Type = tcp | ssl
+%% Port = integer()
+%% Acceptors = integer()
+%% ListenOptions = [Opt]
+%% AcceptTimeout = inifinty | integer()
+%% Pid = pid()
+%% @doc Starts a gen_tcpd process and links to it.
+%% <code>Callback</code> is the module that implements the specific parts of
+%% the behaivour. <code>CallbackArg</code> is the arguments that will be
+%% passed to <code>Module:init/1</code>. <code>Type</code> defines what type
+%% of socket the server should use. <code>Port</code> is the TCP port that
+%% the server will listen on. `Acceptors' is the number of concurrent
+%% processes that should call `accept/1'. <code>ListenOptions</code> will
+%% be passed to the backend module for setting up the socket.
+%% This function should normally be called from a supervisor.
+start_link(Callback, CallbackArg, tcp, Port, Acceptors,
+		ListenOptions, AcceptTimeout) when Acceptors > 0 ->
+	Args = [gen_tcp, {Callback, CallbackArg}, Port, Acceptors,
+		ListenOptions, AcceptTimeout],
 	gen_server:start_link(?MODULE, Args, []);
-start_link(Callback, CallbackArg, ssl, Port, Acceptors, ListenOptions)
-	                                                    when Acceptors > 0 ->
-	Args = [ssl, {Callback, CallbackArg}, Port, Acceptors, ListenOptions],
+start_link(Callback, CallbackArg, ssl, Port, Acceptors,
+		ListenOptions, AcceptTimeout) when Acceptors > 0 ->
+	Args = [ssl, {Callback, CallbackArg}, Port, Acceptors,
+		ListenOptions, AcceptTimeout],
 	gen_server:start_link(?MODULE, Args, []).
 
 %% @spec port(Ref) -> Port::integer()
@@ -278,12 +305,12 @@ setopts({Mod, Socket}, Options) ->
 	Mod:setopts(Socket, Options).
 
 %% @hidden
-init([Type, {Mod, Args}, Port, Acceptors, ListenOptions]) ->
+init([Type, {Mod, Args}, Port, Acceptors, ListenOptions, Timeout]) ->
 	case Mod:init(Args) of
 		{ok, CState} ->
 			case listen(Type, Port, ListenOptions) of
 				{ok, Socket} ->
-					start_acceptors(Acceptors, Mod, CState, Socket),
+					start_acceptors(Acceptors, Mod, CState, Socket, Timeout),
 					{ok, #state{
 						callback = {Mod, CState},
 						socket = Socket
@@ -333,21 +360,21 @@ code_change(_, _, State) ->
 	{ok, State}.
 
 %% @private
-start_acceptors(0, _, _, _) ->
+start_acceptors(0, _, _, _, _) ->
 	ok;
-start_acceptors(Acceptors, Callback, CState, Socket) ->
-	spawn(?MODULE, init_acceptor, [self(), Callback, CState, Socket]),
-	start_acceptors(Acceptors - 1, Callback, CState, Socket).
+start_acceptors(Acceptors, Callback, CState, Socket, Timeout) ->
+	spawn(?MODULE, init_acceptor, [self(), Callback, CState, Socket, Timeout]),
+	start_acceptors(Acceptors - 1, Callback, CState, Socket, Timeout).
 
 %% @hidden
-init_acceptor(Parent, Callback, CState, Socket) ->
+init_acceptor(Parent, Callback, CState, Socket, Timeout) ->
 	link(Parent),
-	accept(Parent, Callback, CState, Socket).
+	accept(Parent, Callback, CState, Socket, Timeout).
 
-accept(Parent, Callback, CState, Socket) ->
-	case do_accept(Socket) of
+accept(Parent, Callback, CState, Socket, Timeout) ->
+	case do_accept(Socket, Timeout) of
 		{ok, Client} ->
-			Args = [Parent, Callback, CState, Socket],
+			Args = [Parent, Callback, CState, Socket, Timeout],
 			spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
 		{error, closed} ->
@@ -363,23 +390,38 @@ listen(Mod, Port, Options) ->
 		{error, Reason} -> {error, {{Mod, listen}, Reason}}
 	end.
 
-do_accept({ssl, Socket}) ->
-	case ssl:transport_accept(Socket) of
-		{ok, Client} ->
-			case ssl:ssl_accept(Client) of
-				ok ->
-					{ok,{ssl, Client}};
-				{error, Reason} ->
-					{error, {{ssl, ssl_accept}, Reason}}
-			end;
-		{error, Reason} ->
-			{error, {{ssl, trasport_accept}, Reason}}
-	end;
-do_accept({Mod, Socket}) ->
-	case Mod:accept(Socket) of
+do_accept({ssl, Socket}, Timeout) ->
+	transport_accept(Socket, Timeout);
+do_accept({Mod, Socket}, Timeout) ->
+	case Mod:accept(Socket, Timeout) of
 		{ok, Client}    -> {ok, {Mod, Client}};
 		{error, Reason} -> {error, {{Mod, accept}, Reason}}
 	end.
+
+transport_accept(Socket, infinity) ->
+	case ssl:transport_accept(Socket) of
+		{ok, Client} ->
+			ssl_accept(Client, infinity);
+		{error, Reason} ->
+			{error, {{ssl, trasport_accept}, Reason}}
+	end;
+transport_accept(Socket, Timeout) ->
+	Start = now(),
+	case ssl:transport_accept(Socket) of
+		{ok, Client} ->
+			MsSpent = timer:now_diff(now(), Start) div 1000,
+			ssl_accept(Client, Timeout - MsSpent);
+		{error, Reason} ->
+			{error, {{ssl, trasport_accept}, Reason}}
+	end.
+
+ssl_accept(Socket, Timeout) when Timeout >= 0 ->
+	case ssl:ssl_accept(Socket, Timeout) of
+		ok              -> {ok, {ssl, Socket}};
+		{error, Reason} -> {error, {{ssl, ssl_accept}, Reason}}
+	end;
+ssl_accept(_, _) ->
+	{error, {ssl, ssl_accept}, timout}.
 
 sock_port({gen_tcp, Socket}) ->
 	element(2, inet:port(Socket));
