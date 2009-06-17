@@ -360,6 +360,18 @@ listen(Mod, Port, Options) ->
 		{error, Reason} -> {error, {{Mod, listen}, Reason}}
 	end.
 
+do_accept({ssl, Socket}) ->
+	case ssl:transport_accept(Socket) of
+		{ok, Client} ->
+			case ssl:ssl_accept(Client) of
+				ok ->
+					{ok,{ssl, Client}};
+				{error, Reason} ->
+					{error, {{ssl, ssl_accept}, Reason}}
+			end;
+		{error, Reason} ->
+			{error, {{ssl, trasport_accept}, Reason}}
+	end;
 do_accept({Mod, Socket}) ->
 	case Mod:accept(Socket) of
 		{ok, Client}    -> {ok, {Mod, Client}};
