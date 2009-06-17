@@ -265,14 +265,17 @@ type(_) ->
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
-%% @spec setopts(Socket::socket(), ListenOptions) -> ok | {error, Reason}
+%% @spec setopts(Socket::socket(), Options) -> ok | {error, Reason}
+%% Options = [{Option, Value} | Option]
+%% Option = atom()
+%% Value = term()
 %% Reason = posix()
 %% @doc Sets options for a socket.
 %% See backend modules for more info.
-setopts({gen_tcp, Socket}, ListenOptions) ->
-	inet:setopts(Socket, ListenOptions);
-setopts({Mod, Socket}, ListenOptions) ->
-	Mod:setopts(Socket, ListenOptions).
+setopts({gen_tcp, Socket}, Options) ->
+	inet:setopts(Socket, Options);
+setopts({Mod, Socket}, Options) ->
+	Mod:setopts(Socket, Options).
 
 %% @hidden
 init([Type, {Mod, Args}, Port, Acceptors, ListenOptions]) ->
