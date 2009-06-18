@@ -376,7 +376,7 @@ check_options([{acceptors, N} | T]) when is_integer(N), N > 0 ->
 	check_options(T);
 check_options([{ssl_accept_timeout, infinity} | T]) ->
 	check_options(T);
-check_options([{ssl_accept_timeout, T} | T]) when is_integer(T), T >= 0 ->
+check_options([{ssl_accept_timeout, TO} | T]) when is_integer(TO), TO >= 0 ->
 	check_options(T);
 check_options([Option | _]) ->
 	erlang:error({bad_option, Option});
