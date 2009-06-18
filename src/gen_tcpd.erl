@@ -259,7 +259,7 @@ setopts({Mod, Socket}, Options) ->
 init([Type, Mod, Args, Port, Options]) ->
 	Acceptors = proplists:get_value(acceptors, Options, 1),
 	Timeout = proplists:get_value(ssl_accept_timeout, Options, infinity),
-	SocketOptions = proplists:get_value(scoket_options, Options, []),
+	SocketOptions = proplists:get_value(socket_options, Options, []),
 	case Mod:init(Args) of
 		{ok, CState} ->
 			case listen(module(Type), Port, SocketOptions) of
@@ -370,7 +370,7 @@ sock_port({gen_tcp, Socket}) ->
 sock_port({Mod, Socket}) ->
 	element(2, Mod:port(Socket)).
 
-check_options([{scoket_options, List} | T]) when is_list(List) ->
+check_options([{socket_options, List} | T]) when is_list(List) ->
 	check_options(T);
 check_options([{acceptors, N} | T]) when is_integer(N), N > 0 ->
 	check_options(T);
