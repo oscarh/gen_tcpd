@@ -356,6 +356,7 @@ start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
 	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
+-spec init_acceptor(pid(), atom(), term(), any(), timeout()) -> _.
 init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
 	link(Parent),
 	accept(Parent, Callback, CState, Socket, SSLTimeout).
@@ -421,6 +422,7 @@ module(tcp)  -> gen_tcp;
 module(Type) -> Type.
 
 %% @hidden
+-spec behaviour_info(any()) -> [{atom(), non_neg_integer()}] | ok.
 behaviour_info(callbacks) ->
 	[{init, 1}, {handle_connection, 2}, {handle_info, 2}, {terminate, 2}];
 behaviour_info(_) ->
