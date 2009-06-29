@@ -8,3 +8,8 @@ ebin/*
 *.swp
 *.swo
 depend
+
+cover_report/*
+
+.args
+.depend
