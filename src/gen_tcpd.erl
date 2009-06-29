@@ -147,7 +147,7 @@
 %% @doc Starts a gen_tcpd process and links to it.
 %% @end
 -spec start_link(atom(), term(), ssl | tcp, 0..65535, [{atom(), term()}]) ->
-    {ok, pid()} | {error, term()} | ignore.
+	{ok, pid()} | {error, term()} | ignore.
 start_link(Callback, CallbackArg, Type, Port, Options) ->
 	Args = [Type, Callback, CallbackArg, Port, Options],
 	ok = check_options(Options),
@@ -186,7 +186,7 @@ stop(Ref) ->
 %% <code>Socket</code>. <code>Size</code> is only relevant if the socket is in
 %% raw format.
 -spec recv(gen_tcpd_socket(), non_neg_integer()) ->
-    {ok, binary() | list()} | {error, atom()}.
+	{ok, binary() | list()} | {error, atom()}.
 recv({Mod, Socket}, Size) ->
 	Mod:recv(Socket, Size).
 
@@ -199,7 +199,7 @@ recv({Mod, Socket}, Size) ->
 %% <code>Size</code> octets of data is not available within
 %% <code>Timeout</code> milliseconds.
 -spec recv(gen_tcpd_socket(), non_neg_integer(), timeout()) ->
-    {ok, binary() | list()} | {error, atom()}.
+	{ok, binary() | list()} | {error, atom()}.
 recv({Mod, Socket}, Size, Timeout) ->
 	Mod:recv(Socket, Size, Timeout).
 
@@ -256,7 +256,7 @@ type(A) ->
 %% @doc Assigns a new controlling process <code>Pid</code> to
 %% <code>Socket</code>.
 -spec controlling_process(gen_tcpd_socket(), pid()) ->
-    ok | {error, atom()}.
+	ok | {error, atom()}.
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
@@ -268,7 +268,7 @@ controlling_process({Mod, Socket}, Pid) ->
 %% @doc Sets options for a socket.
 %% See backend modules for more info.
 -spec setopts(gen_tcpd_socket(), [{atom(), term()} | atom()]) ->
-    ok | {error, atom()}.
+	ok | {error, atom()}.
 setopts({gen_tcp, Socket}, Options) ->
 	inet:setopts(Socket, Options);
 setopts({Mod, Socket}, Options) ->
@@ -276,7 +276,7 @@ setopts({Mod, Socket}, Options) ->
 
 %% @hidden
 -spec init(any()) ->
-    {ok, any()} | {ok, any(), timeout() | hibernate} | {stop, any()} | ignore.
+	{ok, any()} | {ok, any(), timeout() | hibernate} | {stop, any()} | ignore.
 init([Type, Mod, Args, Port, Options]) ->
 	Acceptors = proplists:get_value(acceptors, Options, 1),
 	Timeout = proplists:get_value(ssl_accept_timeout, Options, infinity),
@@ -302,9 +302,9 @@ init([Type, Mod, Args, Port, Options]) ->
 
 %% @hidden
 -spec handle_call(any(), {pid(), any()}, any()) ->
-    {reply, any(), any()} | {reply, any(), any(), timeout() | hibernate} |
-    {noreply, any()} | {noreply, any(), timeout() | hibernate} |
-    {stop, any(), any(), any()} | {stop, any(), any()}.
+	{reply, any(), any()} | {reply, any(), any(), timeout() | hibernate} |
+	{noreply, any()} | {noreply, any(), timeout() | hibernate} |
+	{stop, any(), any(), any()} | {stop, any(), any()}.
 handle_call(port, _, #state{socket = Socket} = State) ->
 	{reply, sock_port(Socket), State};
 handle_call(Request, _, State) ->
@@ -313,8 +313,8 @@ handle_call(Request, _, State) ->
 
 %% @hidden
 -spec handle_cast(any(), any()) ->
-    {noreply, any()} | {noreply, any(), timeout() | hibernate} |
-    {stop, any(), any()}.
+	{noreply, any()} | {noreply, any(), timeout() | hibernate} |
+	{stop, any(), any()}.
 handle_cast(stop, State) ->
 	{stop, normal, State};
 handle_cast(_, State) ->
@@ -322,8 +322,8 @@ handle_cast(_, State) ->
 
 %% @hidden
 -spec handle_info(any(), any()) ->
-    {noreply, any()} | {noreply, any(), timeout() | hibernate} |
-    {stop, any(), any()}.
+	{noreply, any()} | {noreply, any(), timeout() | hibernate} |
+	{stop, any(), any()}.
 handle_info(Info, State) ->
 	{CMod, CState} = State#state.callback,
 	case CMod:handle_info(Info, CState) of
@@ -343,7 +343,7 @@ terminate(Reason, #state{callback = {CMod, CState}} = State) ->
 
 %% @hidden
 -spec code_change(any(), any(), any()) ->
-    {ok, any()}.
+	{ok, any()}.
 code_change(_, _, State) ->
 	{ok, State}.
 
