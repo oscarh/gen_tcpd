@@ -367,7 +367,7 @@ accept(Parent, Callback, CState, Socket, SSLTimeout) ->
 			Args = [Parent, Callback, CState, Socket, SSLTimeout],
 			spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
-		{error, {ssl, ssl_accept}, timeout} -> % SSL negotiation timed out
+		{error, {{ssl, ssl_accept}, timeout}} -> % SSL negotiation timed out
 			accept(Parent, Callback, CState, Socket, SSLTimeout);
 		{error, {_, closed}} ->
 			unlink(Parent), % no need to send exit signals here
