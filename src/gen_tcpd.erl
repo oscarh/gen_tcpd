@@ -128,6 +128,8 @@
 -export([init_acceptor/5]).
 -export([behaviour_info/1]).
 
+-include("gen_tcpd_types.hrl").
+
 -record(state, {callback, acceptors, socket}).
 
 %% @spec start_link(Callback, CallbackArg, Type, Port, Options) -> {ok, Pid}
@@ -144,6 +146,8 @@
 %% Pid = pid()
 %% @doc Starts a gen_tcpd process and links to it.
 %% @end
+-spec start_link(atom(), term(), ssl | tcp, 0..65535, [{atom(), term()}]) ->
+    {ok, pid()} | {error, term()} | ignore.
 start_link(Callback, CallbackArg, Type, Port, Options) ->
 	Args = [Type, Callback, CallbackArg, Port, Options],
 	ok = check_options(Options),
@@ -159,6 +163,7 @@ start_link(Callback, CallbackArg, Type, Port, Options) ->
 %% This is useful if gen server was called with <code>Port</code> =
 %% <code>0</code>.
 %% @end
+-spec port(server_ref()) -> 1..65535.
 port(Ref) ->
 	gen_server:call(Ref, port).
 
@@ -170,6 +175,7 @@ port(Ref) ->
 %% @doc
 %% Stops the gen_tcpd server and frees the listening port.
 %% @end
+-spec stop(server_ref()) -> ok.
 stop(Ref) ->
 	gen_server:cast(Ref, stop).
 
@@ -179,6 +185,8 @@ stop(Ref) ->
 %% @doc Tries to read <code>Size</code> octets of data from
 %% <code>Socket</code>. <code>Size</code> is only relevant if the socket is in
 %% raw format.
+-spec recv(gen_tcpd_socket(), non_neg_integer()) ->
+    {ok, binary() | list()} | {error, atom()}.
 recv({Mod, Socket}, Size) ->
 	Mod:recv(Socket, Size).
 
@@ -190,6 +198,8 @@ recv({Mod, Socket}, Size) ->
 %% raw format. The recv request will return <code>{error, Timeout}</code> if
 %% <code>Size</code> octets of data is not available within
 %% <code>Timeout</code> milliseconds.
+-spec recv(gen_tcpd_socket(), non_neg_integer(), timeout()) ->
+    {ok, binary() | list()} | {error, atom()}.
 recv({Mod, Socket}, Size, Timeout) ->
 	Mod:recv(Socket, Size, Timeout).
 
@@ -197,12 +207,14 @@ recv({Mod, Socket}, Size, Timeout) ->
 %% Packet = [char()] | binary()
 %% Reason = posix()
 %% @doc Sends <code>Packet</code> on <code>Socket</code>.
+-spec send(gen_tcpd_socket(), iolist() | binary()) -> ok | {error, atom()}.
 send({Mod, Socket}, Packet) ->
 	Mod:send(Socket, Packet).
 
 %% @spec close(Socket::socket()) -> ok | {error, Reason}
 %% Reason = posix()
 %% @doc Closes <code>Socket</code>.
+-spec close(gen_tcpd_socket()) -> ok | {error, atom()}.
 close({Mod, Socket}) ->
 	Mod:close(Socket).
 
@@ -211,6 +223,7 @@ close({Mod, Socket}) ->
 %% Port = integer()
 %% Reason = posix()
 %% @doc Returns the remote address and port of <code>Socket</code>.
+-spec peername(gen_tcpd_socket()) -> {ok, {ip_address(), 1..65535}} | {error, atom()}.
 peername({gen_tcp, Socket}) ->
 	inet:peername(Socket);
 peername({Mod, Socket}) ->
@@ -221,6 +234,7 @@ peername({Mod, Socket}) ->
 %% Port = integer()
 %% Reason = posix()
 %% @doc Returns the local address and port of <code>Socket</code>.
+-spec sockname(gen_tcpd_socket()) -> {ok, {ip_address(), 1..65535}} | {error, atom()}.
 sockname({gen_tcp, Socket}) ->
 	inet:sockname(Socket);
 sockname({Mod, Socket}) ->
@@ -228,18 +242,21 @@ sockname({Mod, Socket}) ->
 
 %% @spec type(Socket::socket()) -> tcp | ssl
 %% @doc Returns the type of <code>Socket</code>. 
+-spec type(gen_tcpd_socket()) -> tcp | ssl.
 type({gen_tcp, _}) ->
 	tcp;
 type({ssl, _}) ->
 	ssl;
-type(_) ->
-	exit(badarg).
+type(A) ->
+	exit({badarg, A}).
 
 %% @spec controlling_process(Socket::socket(), Pid::pid()) ->
 %%                                   ok | {error, Reason}
 %% Reason = closed | not_owner | posix()
 %% @doc Assigns a new controlling process <code>Pid</code> to
 %% <code>Socket</code>.
+-spec controlling_process(gen_tcpd_socket(), pid()) ->
+    ok | {error, atom()}.
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
@@ -250,6 +267,8 @@ controlling_process({Mod, Socket}, Pid) ->
 %% Reason = posix()
 %% @doc Sets options for a socket.
 %% See backend modules for more info.
+-spec setopts(gen_tcpd_socket(), [{atom(), term()} | atom()]) ->
+    ok | {error, atom()}.
 setopts({gen_tcp, Socket}, Options) ->
 	inet:setopts(Socket, Options);
 setopts({Mod, Socket}, Options) ->
