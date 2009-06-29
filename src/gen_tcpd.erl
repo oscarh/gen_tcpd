@@ -275,6 +275,8 @@ setopts({Mod, Socket}, Options) ->
 	Mod:setopts(Socket, Options).
 
 %% @hidden
+-spec init(any()) ->
+    {ok, any()} | {ok, any(), timeout() | hibernate} | {stop, any()} | ignore.
 init([Type, Mod, Args, Port, Options]) ->
 	Acceptors = proplists:get_value(acceptors, Options, 1),
 	Timeout = proplists:get_value(ssl_accept_timeout, Options, infinity),
@@ -299,6 +301,10 @@ init([Type, Mod, Args, Port, Options]) ->
 	end.
 
 %% @hidden
+-spec handle_call(any(), {pid(), any()}, any()) ->
+    {reply, any(), any()} | {reply, any(), any(), timeout() | hibernate} |
+    {noreply, any()} | {noreply, any(), timeout() | hibernate} |
+    {stop, any(), any(), any()} | {stop, any(), any()}.
 handle_call(port, _, #state{socket = Socket} = State) ->
 	{reply, sock_port(Socket), State};
 handle_call(Request, _, State) ->
@@ -306,12 +312,18 @@ handle_call(Request, _, State) ->
 
 
 %% @hidden
+-spec handle_cast(any(), any()) ->
+    {noreply, any()} | {noreply, any(), timeout() | hibernate} |
+    {stop, any(), any()}.
 handle_cast(stop, State) ->
 	{stop, normal, State};
 handle_cast(_, State) ->
 	{noreply, State}.
 
 %% @hidden
+-spec handle_info(any(), any()) ->
+    {noreply, any()} | {noreply, any(), timeout() | hibernate} |
+    {stop, any(), any()}.
 handle_info(Info, State) ->
 	{CMod, CState} = State#state.callback,
 	case CMod:handle_info(Info, CState) of
@@ -324,11 +336,14 @@ handle_info(Info, State) ->
 	end.
 
 %% @hidden
+-spec terminate(any(), any()) -> any().
 terminate(Reason, #state{callback = {CMod, CState}} = State) ->
 	close(State#state.socket),
 	CMod:terminate(Reason, CState).
 
 %% @hidden
+-spec code_change(any(), any(), any()) ->
+    {ok, any()}.
 code_change(_, _, State) ->
 	{ok, State}.
 
