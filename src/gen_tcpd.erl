@@ -352,7 +352,7 @@ start_acceptors(0, _, _, _, _) ->
 	ok;
 start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
 	Args = [self(), Callback, CState, Socket, SSLTimeout],
-	spawn(?MODULE, init_acceptor, Args),
+	proc_lib:spawn(?MODULE, init_acceptor, Args),
 	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
@@ -365,7 +365,7 @@ accept(Parent, Callback, CState, Socket, SSLTimeout) ->
 	case do_accept(Socket, SSLTimeout) of
 		{ok, Client} ->
 			Args = [Parent, Callback, CState, Socket, SSLTimeout],
-			spawn(?MODULE, init_acceptor, Args),
+			proc_lib:spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
 		{error, {{ssl, ssl_accept}, timeout}} -> % SSL negotiation timed out
 			accept(Parent, Callback, CState, Socket, SSLTimeout);
