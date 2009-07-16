@@ -358,7 +358,9 @@ start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
 %% @hidden
 -spec init_acceptor(pid(), atom(), term(), any(), timeout()) -> _.
 init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
-	link(Parent),
+	try link(Parent)
+		catch exit:noproc -> exit(normal)
+	end,
 	accept(Parent, Callback, CState, Socket, SSLTimeout).
 
 accept(Parent, Callback, CState, Socket, SSLTimeout) ->
