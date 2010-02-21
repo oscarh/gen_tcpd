@@ -1,0 +1,4 @@
+depend
+*.swp
+ebin/*.beam
+ebin/*.app
