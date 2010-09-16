@@ -394,7 +394,7 @@ do_accept({ssl, Socket}, SSLTimeout) ->
 					{error, {{ssl, ssl_accept}, Reason}}
 			end;
 		{error, Reason} ->
-			{error, {{ssl, trasport_accept}, Reason}}
+			{error, {{ssl, transport_accept}, Reason}}
 	end;
 do_accept({Mod, Socket}, _) ->
 	case Mod:accept(Socket) of
