@@ -361,6 +361,7 @@ init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
 	try link(Parent)
 		catch error:noproc -> exit(normal)
 	end,
+	put('$ancestors', tl(get('$ancestors'))),
 	accept(Parent, Callback, CState, Socket, SSLTimeout).
 
 accept(Parent, Callback, CState, Socket, SSLTimeout) ->
