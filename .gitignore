@@ -1,3 +1,4 @@
+doc
 depend
 *.swp
 ebin/*.beam
