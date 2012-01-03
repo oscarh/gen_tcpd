@@ -53,8 +53,8 @@
 %%%     Types Args = term()
 %%%           Result = {ok, State} | {stop, Reason}
 %%% </pre>
-%%% After {@link start_link/5} has been called this function
-%%% is called by the new to initialise a state. If the initialisation is
+%%% After {@link start_link/5} has been called this function is executed
+%%% by the new process to initialise its state. If the initialisation is
 %%% successful the function should return <code>{ok, State}</code> where
 %%% <code>State</code> is the state which will be passed to the client in
 %%% in the next callback. <code>Args</code> is the <code>Args</code> passed
