@@ -105,7 +105,10 @@
 -module(gen_tcpd).
 -behaviour(gen_server).
 
--export([start_link/5]).
+-export([
+	start_link/5,
+	start_link/6
+]).
 -export([
 	send/2,
 	recv/2,
@@ -154,6 +157,30 @@ start_link(Callback, CallbackArg, Type, Port, Options) ->
 	Args = [Type, Callback, CallbackArg, Port, Options],
 	ok = check_options(Options),
 	gen_server:start_link(?MODULE, Args, []).
+
+%% @spec start_link(ServerName, Callback, CallbackArg, Type, Port, Options) -> {ok, Pid}
+%% ServerName = {local, Name} | {global, GlobalName}
+%% Name = atom()
+%% GlobalName = term()
+%% Callback = atom()
+%% CallbackArg = term()
+%% Type = tcp | ssl
+%% Port = integer()
+%% Options = [Opt]
+%% Opt = {socket_options, SocketOptions} | {acceptors, Acceptors} |
+%%       {ssl_accept_timeout, Timeout}
+%% SocketOptions = [SocketOpt]
+%% Acceptors = integer()
+%% Timeout = infinity | integer()
+%% Pid = pid()
+%% @doc Starts a gen_tcpd process, links to it and register its name.
+%% @end
+-spec start_link({local, atom()} | {global, term()}, atom(), term(), ssl | tcp, 0..65535, [{atom(), term()}]) ->
+	{ok, pid()} | {error, term()} | ignore.
+start_link(ServerName, Callback, CallbackArg, Type, Port, Options) ->
+	Args = [Type, Callback, CallbackArg, Port, Options],
+	ok = check_options(Options),
+	gen_server:start_link(ServerName, ?MODULE, Args, []).
 
 %% @spec port(Ref) -> Port::integer()
 %% Ref = Name | {Name, Node} | {global, GlobalName} | pid()
