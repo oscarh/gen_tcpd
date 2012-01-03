@@ -81,9 +81,12 @@
 %%% bottleneck in accepting connections.
 %%%
 %%% <pre>
-%%% Module:handle_info(Info, State) -> noreply
+%%% Module:handle_info(Info, State) -> Result
 %%%     Types Info = term()
 %%%           State = term()
+%%%           Result = {noreply, NewState} | {stop, Reason, NewState}
+%%%           NewState = term()
+%%%           Reason = term()
 %%% </pre>
 %%% This function is called if the gen_tcpd process receives any messasge it
 %%% dosen't recognise. E.g. <code>{'EXIT', Pid, Reason}</code> messages if
@@ -94,8 +97,7 @@
 %%%     Types Reason = term()
 %%%           State = term()
 %%% </pre>
-%%% This function will be called if any of the other callbacks return
-%%% <code>{stop, Reason}</code>.
+%%% This function is called by a gen_tcpd when it is about to terminate.
 %%%
 %%% @type socket()
 %%% @end
@@ -327,10 +329,10 @@ handle_cast(_, State) ->
 handle_info(Info, State) ->
 	{CMod, CState} = State#state.callback,
 	case CMod:handle_info(Info, CState) of
-		noreply ->
-			{noreply, State};
-		{stop, Reason} ->
-			{stop, Reason, State};
+		{noreply, NewState} ->
+			{noreply, NewState};
+		{stop, Reason, NewState} ->
+			{stop, Reason, NewState};
 		Other ->
 			exit({invalid_return_value, Other})
 	end.
