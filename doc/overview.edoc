@@ -13,7 +13,7 @@ supervisor and will integrate naturally in any OTP application.
 
 Accept TCP connections, send a HELO message and close the socket:
 <pre>
--module(tcpd_test).
+-module(tcpd_example).
 -behaviour(gen_tcpd).
 
 -export([start_link/0]).
@@ -27,8 +27,7 @@ init(_Args) ->
 
 handle_connection(Socket, State) ->
 	gen_tcpd:send(Socket, "HELO\n"),
-	gen_tcpd:close(Socket),
-	{noreply, State}.
+	gen_tcpd:close(Socket).
 
 handle_info(_Info, State) ->
 	{noreply, State}.
