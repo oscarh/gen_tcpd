@@ -84,8 +84,7 @@
 %%% Module:handle_info(Info, State) -> Result
 %%%     Types Info = term()
 %%%           State = term()
-%%%           Result = {noreply, NewState} | {stop, Reason, NewState}
-%%%           NewState = term()
+%%%           Result = noreply | {stop, Reason}
 %%%           Reason = term()
 %%% </pre>
 %%% This function is called if the gen_tcpd process receives any messasge it
@@ -97,7 +96,8 @@
 %%%     Types Reason = term()
 %%%           State = term()
 %%% </pre>
-%%% This function is called by a gen_tcpd when it is about to terminate.
+%%% This function will be called if any of the other callbacks return
+%%% <code>{stop, Reason}</code>.
 %%%
 %%% @type socket()
 %%% @end
@@ -189,7 +189,7 @@ start_link(ServerName, Callback, CallbackArg, Type, Port, Options) ->
 %% GlobalName = term()
 %% @doc
 %% Returns the listening port for the gen_tcpd.
-%% This is useful if gen server was called with <code>Port</code> =
+%% This is useful if gen_server was called with <code>Port</code> =
 %% <code>0</code>.
 %% @end
 -spec port(server_ref()) -> 1..65535.
@@ -339,7 +339,6 @@ handle_call(port, _, #state{socket = Socket} = State) ->
 handle_call(Request, _, State) ->
 	{reply, {error, {bad_request, Request}}, State}.
 
-
 %% @hidden
 -spec handle_cast(any(), any()) ->
 	{noreply, any()} | {noreply, any(), timeout() | hibernate} |
@@ -356,10 +355,10 @@ handle_cast(_, State) ->
 handle_info(Info, State) ->
 	{CMod, CState} = State#state.callback,
 	case CMod:handle_info(Info, CState) of
-		{noreply, NewState} ->
-			{noreply, NewState};
-		{stop, Reason, NewState} ->
-			{stop, Reason, NewState};
+		noreply ->
+			{noreply, State};
+		{stop, Reason} ->
+			{stop, Reason, State};
 		Other ->
 			exit({invalid_return_value, Other})
 	end.

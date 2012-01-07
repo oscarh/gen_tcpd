@@ -30,7 +30,7 @@ handle_connection(Socket, State) ->
 	gen_tcpd:close(Socket).
 
 handle_info(_Info, State) ->
-	{noreply, State}.
+	noreply.
 
 terminate(_Reason, _State) ->
 	ok.
