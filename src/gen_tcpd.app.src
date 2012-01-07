@@ -32,8 +32,8 @@
 %%% ----------------------------------------------------------------------------
 {application, gen_tcpd,  [
 	{description, "Generic TCP accept loop."},
-	{vsn, "%VSN%"}, 
-	{modules, [%MODULES%]},
+	{vsn, "0.4.2"},
+	{modules, [gen_tcpd]},
 	{registered, []},
 	{applications, [kernel, stdlib]},
 	{env, []}
