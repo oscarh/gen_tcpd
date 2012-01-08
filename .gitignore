@@ -1,4 +1,4 @@
 .*.sw[nop]
-ebin
-doc
+ebin/
+doc/
 .eunit/
