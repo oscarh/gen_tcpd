@@ -1,3 +1,4 @@
-.*.swp
+.*.sw[nop]
 ebin
 doc
+.eunit/
