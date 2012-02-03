@@ -6,7 +6,7 @@ else
 REBAR_GET ?= curl -s -f $(REBAR_URL) >rebar
 endif
 
-.PHONY: all compile doc test dialyzer clean
+.PHONY: all compile doc test clean
 
 all: compile doc
 
@@ -22,9 +22,6 @@ doc: rebar
 
 test: rebar
 	./rebar eunit
-
-dialyzer: rebar
-	./rebar analyze
 
 clean: rebar
 	./rebar clean
