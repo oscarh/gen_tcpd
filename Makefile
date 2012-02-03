@@ -6,7 +6,7 @@ else
 REBAR_GET ?= curl -s -f $(REBAR_URL) >rebar
 endif
 
-.PHONY: all compile doc test clean
+.PHONY: all compile doc test clean clean-all
 
 all: compile doc
 
@@ -25,3 +25,6 @@ test: rebar
 
 clean: rebar
 	./rebar clean
+
+clean-all:
+	rm -rf rebar ebin doc/*{-info,.html,.css,.png}
