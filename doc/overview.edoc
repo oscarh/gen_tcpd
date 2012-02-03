@@ -1,6 +1,6 @@
-@copyright 2008 Martin Carlson, Oscar HellstrÃ¶m
+@copyright 2008 Martin Carlson, Oscar Hellström
 @author Martin Carlson <martin@martinc.eu>
-@author Oscar HellstrÃ¶m <oscar@hellstrom.st> [http://oscar.hellstrom.st]
+@author Oscar Hellström <oscar@hellstrom.st> [http://oscar.hellstrom.st]
 @version {@version}, {@date}, {@time}
 
 @doc gen_tcpd is an erlang behaviour for TCP accept loops.
