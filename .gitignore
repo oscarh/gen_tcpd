@@ -1,4 +1,5 @@
 .*.sw[nop]
-ebin
-doc
 .eunit/
+rebar
+ebin/
+doc/
