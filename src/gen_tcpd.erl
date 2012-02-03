@@ -382,7 +382,7 @@ start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
 	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
--spec init_acceptor(pid(), atom(), term(), any(), timeout()) -> _.
+-spec init_acceptor(pid(), atom(), term(), any(), timeout()) -> any().
 init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
 	try link(Parent)
 		catch error:noproc -> exit(normal)
