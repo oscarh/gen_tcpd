@@ -1,4 +1,5 @@
 .*.sw[nop]
+.eunit/
+rebar
 ebin/
 doc/
-.eunit/
