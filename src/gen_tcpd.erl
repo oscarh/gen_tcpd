@@ -382,18 +382,24 @@ start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
 	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
--spec init_acceptor(pid(), atom(), term(), any(), timeout()) -> any().
+-spec init_acceptor(pid() | {prune, pid()}, atom(), term(), any(), timeout()) -> any().
 init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
-	try link(Parent)
+	Parent2 = case Parent of
+		{prune, Pid} ->
+			put('$ancestors', tl(get('$ancestors'))),
+			Pid;
+		Pid ->
+			Pid
+	end,
+	try link(Parent2)
 		catch error:noproc -> exit(normal)
 	end,
-	put('$ancestors', tl(get('$ancestors'))),
-	accept(Parent, Callback, CState, Socket, SSLTimeout).
+	accept(Parent2, Callback, CState, Socket, SSLTimeout).
 
 accept(Parent, Callback, CState, Socket, SSLTimeout) ->
 	case do_accept(Socket, SSLTimeout) of
 		{ok, Client} ->
-			Args = [Parent, Callback, CState, Socket, SSLTimeout],
+			Args = [{prune, Parent}, Callback, CState, Socket, SSLTimeout],
 			proc_lib:spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
 		{error, {{ssl, ssl_accept}, timeout}} -> % SSL negotiation timed out
