@@ -382,19 +382,15 @@ start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
 	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
--spec init_acceptor(pid() | {prune, pid()}, atom(), term(), any(), timeout()) -> any().
+-spec init_acceptor({prune, pid()} | pid(), atom(), term(), any(), timeout()) -> any().
+init_acceptor({prune, Parent}, Callback, CState, Socket, SSLTimeout) ->
+	put('$ancestors', tl(get('$ancestors'))),
+	init_acceptor(Parent, Callback, CState, Socket, SSLTimeout);
 init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
-	Parent2 = case Parent of
-		{prune, Pid} ->
-			put('$ancestors', tl(get('$ancestors'))),
-			Pid;
-		Pid ->
-			Pid
-	end,
-	try link(Parent2)
+	try link(Parent)
 		catch error:noproc -> exit(normal)
 	end,
-	accept(Parent2, Callback, CState, Socket, SSLTimeout).
+	accept(Parent, Callback, CState, Socket, SSLTimeout).
 
 accept(Parent, Callback, CState, Socket, SSLTimeout) ->
 	case do_accept(Socket, SSLTimeout) of
