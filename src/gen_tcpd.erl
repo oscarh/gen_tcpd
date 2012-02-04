@@ -70,10 +70,9 @@
 %%% process. This process should handle the TCP connection and do whatever
 %%% it wants to. When this function returns, the process exits.
 %%%
-%%% The process which this is called from is linked to the `gen_tcpd'
-%%% process. It is allowed to trap exits in the `gen_tcpd' process if
-%%% this is wanted. It's also possible to pass the `gen_tcpd' process as
-%%% part of the `State' argument to unlink from it.
+%%% The process which this is called from is optionally linked to the
+%%% `gen_tcpd' process. It is allowed to trap exits in the `gen_tcpd' process
+%%% if this is wanted.
 %%%
 %%% It might seem strange that the process is not under some individual
 %%% supervisor, but it has been shown that starting children under
@@ -146,9 +145,10 @@
 %% Port = integer()
 %% Options = [Opt]
 %% Opt = {socket_options, SocketOptions} | {acceptors, Acceptors} |
-%%       {ssl_accept_timeout, Timeout}
+%%       {link_acceptors, LinkAcceptors} | {ssl_accept_timeout, Timeout}
 %% SocketOptions = [SocketOpt]
 %% Acceptors = integer()
+%% LinkAcceptors = bool()
 %% Timeout = infinity | integer()
 %% Pid = pid()
 %% @doc Starts a gen_tcpd process and links to it.
@@ -170,9 +170,10 @@ start_link(Callback, CallbackArg, Type, Port, Options) ->
 %% Port = integer()
 %% Options = [Opt]
 %% Opt = {socket_options, SocketOptions} | {acceptors, Acceptors} |
-%%       {ssl_accept_timeout, Timeout}
+%%       {link_acceptors, LinkAcceptors} | {ssl_accept_timeout, Timeout}
 %% SocketOptions = [SocketOpt]
 %% Acceptors = integer()
+%% LinkAcceptors = bool()
 %% Timeout = infinity | integer()
 %% Pid = pid()
 %% @doc Starts a gen_tcpd process, links to it and register its name.
@@ -312,11 +313,15 @@ init([Type, Mod, Args, Port, Options]) ->
 	Acceptors = proplists:get_value(acceptors, Options, 1),
 	Timeout = proplists:get_value(ssl_accept_timeout, Options, infinity),
 	SocketOptions = proplists:get_value(socket_options, Options, []),
+	Parent = case proplists:get_value(link_acceptors, Options, true) of
+		true  -> self();
+		false -> none
+	end,
 	case Mod:init(Args) of
 		{ok, CState} ->
 			case listen(module(Type), Port, SocketOptions) of
 				{ok, Socket} ->
-					start_acceptors(Acceptors, Mod, CState, Socket, Timeout),
+					start_acceptors(Acceptors, Parent, Mod, CState, Socket, Timeout),
 					{ok, #state{
 						callback = {Mod, CState},
 						socket = Socket
@@ -374,15 +379,20 @@ code_change(_, _, State) ->
 	{ok, State}.
 
 %% @private
-start_acceptors(0, _, _, _, _) ->
+start_acceptors(0, _, _, _, _, _) ->
 	ok;
-start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
-	Args = [self(), Callback, CState, Socket, SSLTimeout],
+start_acceptors(Acceptors, Parent, Callback, CState, Socket, SSLTimeout) ->
+	Args = [Parent, Callback, CState, Socket, SSLTimeout],
 	proc_lib:spawn(?MODULE, init_acceptor, Args),
-	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
+	start_acceptors(Acceptors - 1, Parent, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
--spec init_acceptor({prune, pid()} | pid(), atom(), term(), any(), timeout()) -> any().
+-spec init_acceptor(Parent, atom(), term(), any(), timeout()) -> any() when
+	Parent :: {prune, none} | none | {prune, pid()} | pid().
+init_acceptor({prune, none}, Callback, CState, Socket, SSLTimeout) ->
+	accept(none, Callback, CState, Socket, SSLTimeout);
+init_acceptor(none, Callback, CState, Socket, SSLTimeout) ->
+	accept(none, Callback, CState, Socket, SSLTimeout);
 init_acceptor({prune, Parent}, Callback, CState, Socket, SSLTimeout) ->
 	put('$ancestors', tl(get('$ancestors'))),
 	init_acceptor(Parent, Callback, CState, Socket, SSLTimeout);
@@ -439,6 +449,8 @@ sock_port({Mod, Socket}) ->
 check_options([{socket_options, List} | T]) when is_list(List) ->
 	check_options(T);
 check_options([{acceptors, N} | T]) when is_integer(N), N > 0 ->
+	check_options(T);
+check_options([{link_acceptors, B} | T]) when is_boolean(B) ->
 	check_options(T);
 check_options([{ssl_accept_timeout, infinity} | T]) ->
 	check_options(T);
