@@ -116,6 +116,7 @@
 	peername/1,
 	port/1,
 	sockname/1,
+	getopts/2,
 	setopts/2,
 	controlling_process/2,
 	type/1,
@@ -291,6 +292,21 @@ type(A) ->
 	ok | {error, atom()}.
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
+
+%% @spec getopts(Socket::socket(), OptionNames) -> {ok, Options} | {error, Reason}
+%% OptionNames = [atom()]
+%% Options = [{Option, Value} | Option]
+%% Option = atom()
+%% Value = term()
+%% Reason = posix()
+%% @doc Gets values for socket options.
+%% See backend modules for more info.
+-spec getopts(gen_tcpd_socket(), [atom()]) ->
+	{ok, [{atom(), term()} | atom()] | {error, atom()}.
+getopts({gen_tcp, Socket}, OptionNames) ->
+	inet:getopts(Socket, OptionNames);
+getopts({Mod, Socket}, OptionNames) ->
+	Mod:getopts(Socket, OptionNames).
 
 %% @spec setopts(Socket::socket(), Options) -> ok | {error, Reason}
 %% Options = [{Option, Value} | Option]
