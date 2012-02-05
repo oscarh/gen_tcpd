@@ -302,7 +302,7 @@ controlling_process({Mod, Socket}, Pid) ->
 %% @doc Gets values for socket options.
 %% See backend modules for more info.
 -spec getopts(gen_tcpd_socket(), [atom()]) ->
-	{ok, [{atom(), term()} | atom()] | {error, atom()}.
+	{ok, [{atom(), term()} | atom()]} | {error, atom()}.
 getopts({gen_tcp, Socket}, OptionNames) ->
 	inet:getopts(Socket, OptionNames);
 getopts({Mod, Socket}, OptionNames) ->
