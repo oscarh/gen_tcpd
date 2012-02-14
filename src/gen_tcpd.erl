@@ -426,8 +426,10 @@ accept(Parent, Callback, CState, Socket, SSLTimeout) ->
 			Callback:handle_connection(Client, CState);
 		{error, {{ssl, ssl_accept}, timeout}} -> % SSL negotiation timed out
 			accept(Parent, Callback, CState, Socket, SSLTimeout);
-		{error, {_, closed}} ->
+		{error, {_, closed}} when Parent /= none ->
 			unlink(Parent), % no need to send exit signals here
+			exit(normal);
+		{error, {_, closed}} ->
 			exit(normal);
 		Other ->
 			erlang:error(Other)
