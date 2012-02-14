@@ -462,7 +462,7 @@ sock_port({gen_tcp, Socket}) ->
 sock_port({Mod, Socket}) ->
 	element(2, Mod:port(Socket)).
 
-check_options([{socket_options, List} | T]) when is_list(List) ->
+check_options([{socket_options, L} | T]) when is_list(L) ->
 	check_options(T);
 check_options([{acceptors, N} | T]) when is_integer(N), N > 0 ->
 	check_options(T);
