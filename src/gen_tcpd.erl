@@ -138,10 +138,9 @@
 -include("gen_tcpd_types.hrl").
 
 -record(state, {callback :: {module(), term()},
-		socket   :: gen_tcpd_socket()}).
+		socket :: gen_tcpd_socket()}).
 
--type state()  :: #state{}.
--type socket() :: port().
+-type state() :: #state{}.
 
 %% @spec start_link(Callback, CallbackArg, Type, Port, Options) -> {ok, Pid}
 %% Callback = atom()
@@ -491,7 +490,7 @@ module(tcp)  -> gen_tcp;
 module(Type) -> Type.
 
 %% @hidden
--spec behaviour_info(any()) -> [{atom(), non_neg_integer()}] | ok.
+-spec behaviour_info(any()) -> [{module(), non_neg_integer()}] | ok.
 behaviour_info(callbacks) ->
 	[{init, 1}, {handle_connection, 2}, {handle_info, 2}, {terminate, 2}];
 behaviour_info(_) ->
