@@ -3,8 +3,8 @@
 @author Oscar Hellström <oscar@hellstrom.st> [http://oscar.hellstrom.st]
 @version {@version}, {@date}, {@time}
 
-@doc gen_tcpd is an erlang behaviour for TCP accept loops.
-gen_tcpd lets you implement a tcp server with lots of flexibility, but takes
+@doc gen_tcpd is an Erlang behaviour for TCP accept loops.
+gen_tcpd lets you implement a TCP server with lots of flexibility, but takes
 care of dealing with accepting new connections and delivers them using a
 callback. Since gen_tcpd is an OTP behaviour your module will be put under a
 supervisor and will integrate naturally in any OTP application.

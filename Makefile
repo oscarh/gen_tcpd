@@ -1,9 +1,9 @@
-REBAR_URL ?= http://cloud.github.com/downloads/basho/rebar/rebar
+REBAR_URL ?= http://github.com/downloads/basho/rebar/rebar
 
 ifneq ($(shell which wget 2>/dev/null),)
 REBAR_GET ?= wget -q $(REBAR_URL)
 else
-REBAR_GET ?= curl -s -f $(REBAR_URL) >rebar
+REBAR_GET ?= curl -s -f -L $(REBAR_URL) >rebar
 endif
 
 .PHONY: all compile doc test clean clean-all

@@ -62,7 +62,7 @@
 %%%
 %%% <pre>
 %%% Module:handle_connection(Socket, State) -> void()
-%%%     Types Socket = {@link socket()}
+%%%     Types Socket = {@link gen_tcpd_socket()}
 %%%           State = term()
 %%% </pre>
 %%% When a TCP / SSL connection is accepted,
@@ -70,10 +70,9 @@
 %%% process. This process should handle the TCP connection and do whatever
 %%% it wants to. When this function returns, the process exits.
 %%%
-%%% The process which this is called from is linked to the `gen_tcpd'
-%%% process. It is allowed to trap exits in the `gen_tcpd' process if
-%%% this is wanted. It's also possible to pass the `gen_tcpd' process as
-%%% part of the `State' argument to unlink from it.
+%%% The process which this is called from is optionally linked to the
+%%% `gen_tcpd' process. It is allowed to trap exits in the `gen_tcpd' process
+%%% if this is wanted.
 %%%
 %%% It might seem strange that the process is not under some individual
 %%% supervisor, but it has been shown that starting children under
@@ -99,7 +98,7 @@
 %%% This function will be called if any of the other callbacks return
 %%% <code>{stop, Reason}</code>.
 %%%
-%%% @type socket()
+%%% @type gen_tcpd_socket()
 %%% @end
 %%% ----------------------------------------------------------------------------
 -module(gen_tcpd).
@@ -117,9 +116,12 @@
 	peername/1,
 	port/1,
 	sockname/1,
+	getopts/2,
 	setopts/2,
 	controlling_process/2,
 	type/1,
+	sock/1,
+	make_sock/2,
 	stop/1
 ]).
 -export([
@@ -135,9 +137,10 @@
 
 -include("gen_tcpd_types.hrl").
 
--record(state, {callback    :: {atom() | tuple(), term()},
-                socket      :: {atom() | tuple(), term()}}).
--opaque state() :: #state{}.
+-record(state, {callback :: {module(), term()},
+		socket :: gen_tcpd_socket()}).
+
+-type state() :: #state{}.
 
 %% @spec start_link(Callback, CallbackArg, Type, Port, Options) -> {ok, Pid}
 %% Callback = atom()
@@ -146,13 +149,13 @@
 %% Port = integer()
 %% Options = [Opt]
 %% Opt = {socket_options, SocketOptions} | {acceptors, Acceptors} |
-%%       {ssl_accept_timeout, Timeout}
+%%       {link_acceptors, LinkAcceptors} | {ssl_accept_timeout, Timeout}
 %% SocketOptions = [SocketOpt]
 %% Acceptors = integer()
+%% LinkAcceptors = bool()
 %% Timeout = infinity | integer()
 %% Pid = pid()
 %% @doc Starts a gen_tcpd process and links to it.
-%% @end
 -spec start_link(atom(), term(), ssl | tcp, 0..65535, [{atom(), term()}]) ->
 	{ok, pid()} | {error, term()} | ignore.
 start_link(Callback, CallbackArg, Type, Port, Options) ->
@@ -170,13 +173,13 @@ start_link(Callback, CallbackArg, Type, Port, Options) ->
 %% Port = integer()
 %% Options = [Opt]
 %% Opt = {socket_options, SocketOptions} | {acceptors, Acceptors} |
-%%       {ssl_accept_timeout, Timeout}
+%%       {link_acceptors, LinkAcceptors} | {ssl_accept_timeout, Timeout}
 %% SocketOptions = [SocketOpt]
 %% Acceptors = integer()
+%% LinkAcceptors = bool()
 %% Timeout = infinity | integer()
 %% Pid = pid()
 %% @doc Starts a gen_tcpd process, links to it and register its name.
-%% @end
 -spec start_link({local, atom()} | {global, term()}, atom(), term(), ssl | tcp, 0..65535, [{atom(), term()}]) ->
 	{ok, pid()} | {error, term()} | ignore.
 start_link(ServerName, Callback, CallbackArg, Type, Port, Options) ->
@@ -191,9 +194,7 @@ start_link(ServerName, Callback, CallbackArg, Type, Port, Options) ->
 %% GlobalName = term()
 %% @doc
 %% Returns the listening port for the gen_tcpd.
-%% This is useful if gen_server was called with <code>Port</code> =
-%% <code>0</code>.
-%% @end
+%% This is useful if gen_server was called with <code>Port</code> = <code>0</code>.
 -spec port(server_ref()) -> 1..65535.
 port(Ref) ->
 	gen_server:call(Ref, port).
@@ -203,14 +204,12 @@ port(Ref) ->
 %% Name = atom()
 %% Node = atom()
 %% GlobalName = term()
-%% @doc
-%% Stops the gen_tcpd server and frees the listening port.
-%% @end
+%% @doc Stops the gen_tcpd server and frees the listening port.
 -spec stop(server_ref()) -> ok.
 stop(Ref) ->
 	gen_server:cast(Ref, stop).
 
-%% @spec recv(Socket::socket(), Size::integer()) -> Result
+%% @spec recv(Socket::gen_tcpd_socket(), Size::integer()) -> Result
 %% Result = {ok, Packet} | {error, Reason}
 %% Reason = {error, timeout} | {error, posix()}
 %% @doc Tries to read <code>Size</code> octets of data from
@@ -221,7 +220,7 @@ stop(Ref) ->
 recv({Mod, Socket}, Size) ->
 	Mod:recv(Socket, Size).
 
-%% @spec recv(Socket::socket(), Size::integer(), Timeout::integer()) -> Result
+%% @spec recv(Socket::gen_tcpd_socket(), Size::integer(), Timeout::integer()) -> Result
 %% Result = {ok, Packet} | {error, Reason}
 %% Reason = {error, timeout} | {error, posix()}
 %% @doc Tries to read <code>Size</code> octets of data from
@@ -234,7 +233,7 @@ recv({Mod, Socket}, Size) ->
 recv({Mod, Socket}, Size, Timeout) ->
 	Mod:recv(Socket, Size, Timeout).
 
-%% @spec send(Socket::socket(), Packet) -> ok | {error, Reason}
+%% @spec send(Socket::gen_tcpd_socket(), Packet) -> ok | {error, Reason}
 %% Packet = [char()] | binary()
 %% Reason = posix()
 %% @doc Sends <code>Packet</code> on <code>Socket</code>.
@@ -242,14 +241,14 @@ recv({Mod, Socket}, Size, Timeout) ->
 send({Mod, Socket}, Packet) ->
 	Mod:send(Socket, Packet).
 
-%% @spec close(Socket::socket()) -> ok | {error, Reason}
+%% @spec close(Socket::gen_tcpd_socket()) -> ok | {error, Reason}
 %% Reason = posix()
 %% @doc Closes <code>Socket</code>.
 -spec close(gen_tcpd_socket()) -> ok | {error, atom()}.
 close({Mod, Socket}) ->
 	Mod:close(Socket).
 
-%% @spec peername(Socket::socket()) -> {ok, {Address, Port}} | {error, Reason}
+%% @spec peername(Socket::gen_tcpd_socket()) -> {ok, {Address, Port}} | {error, Reason}
 %% Address = ipaddress()
 %% Port = integer()
 %% Reason = posix()
@@ -260,7 +259,7 @@ peername({gen_tcp, Socket}) ->
 peername({Mod, Socket}) ->
 	Mod:peername(Socket).
 
-%% @spec sockname(Socket::socket()) -> {ok, {Address, Port}} | {error, Reason}
+%% @spec sockname(Socket::gen_tcpd_socket()) -> {ok, {Address, Port}} | {error, Reason}
 %% Address = ipaddress()
 %% Port = integer()
 %% Reason = posix()
@@ -271,17 +270,27 @@ sockname({gen_tcp, Socket}) ->
 sockname({Mod, Socket}) ->
 	Mod:sockname(Socket).
 
-%% @spec type(Socket::socket()) -> tcp | ssl
-%% @doc Returns the type of <code>Socket</code>. 
+%% @spec type(Socket::gen_tcpd_socket()) -> tcp | ssl
+%% @doc Returns the type of <code>Socket</code>.
 -spec type(gen_tcpd_socket()) -> tcp | ssl.
 type({gen_tcp, _}) ->
 	tcp;
 type({ssl, _}) ->
 	ssl;
-type(A) ->
-	exit({badarg, A}).
+type(Socket) ->
+	exit({badarg, Socket}).
 
-%% @spec controlling_process(Socket::socket(), Pid::pid()) ->
+%% @spec sock(Socket::gen_tcpd_socket()) -> socket()
+%% @doc Returns the underlying socket port of <code>Socket</code>.
+-spec sock(gen_tcpd_socket()) -> socket().
+sock({_, Socket}) -> Socket.
+
+%% @spec make_sock(tcp | ssl, Socket::socket()) -> gen_tcpd_socket()
+%% @doc Returns a gen_tcpd socket from socket port <code>Socket</code>.
+-spec make_sock(tcp | ssl, socket()) -> gen_tcpd_socket().
+make_sock(Type, Socket) -> {module(Type), Socket}.
+
+%% @spec controlling_process(Socket::gen_tcpd_socket(), Pid::pid()) ->
 %%                                   ok | {error, Reason}
 %% Reason = closed | not_owner | posix()
 %% @doc Assigns a new controlling process <code>Pid</code> to
@@ -291,7 +300,22 @@ type(A) ->
 controlling_process({Mod, Socket}, Pid) ->
 	Mod:controlling_process(Socket, Pid).
 
-%% @spec setopts(Socket::socket(), Options) -> ok | {error, Reason}
+%% @spec getopts(Socket::gen_tcpd_socket(), OptionNames) -> {ok, Options} | {error, Reason}
+%% OptionNames = [atom()]
+%% Options = [{Option, Value} | Option]
+%% Option = atom()
+%% Value = term()
+%% Reason = posix()
+%% @doc Gets values for socket options.
+%% See backend modules for more info.
+-spec getopts(gen_tcpd_socket(), [atom()]) ->
+	{ok, [{atom(), term()} | atom()]} | {error, atom()}.
+getopts({gen_tcp, Socket}, OptionNames) ->
+	inet:getopts(Socket, OptionNames);
+getopts({Mod, Socket}, OptionNames) ->
+	Mod:getopts(Socket, OptionNames).
+
+%% @spec setopts(Socket::gen_tcpd_socket(), Options) -> ok | {error, Reason}
 %% Options = [{Option, Value} | Option]
 %% Option = atom()
 %% Value = term()
@@ -312,11 +336,15 @@ init([Type, Mod, Args, Port, Options]) ->
 	Acceptors = proplists:get_value(acceptors, Options, 1),
 	Timeout = proplists:get_value(ssl_accept_timeout, Options, infinity),
 	SocketOptions = proplists:get_value(socket_options, Options, []),
+	Parent = case proplists:get_value(link_acceptors, Options, true) of
+		true  -> self();
+		false -> none
+	end,
 	case Mod:init(Args) of
 		{ok, CState} ->
 			case listen(module(Type), Port, SocketOptions) of
 				{ok, Socket} ->
-					start_acceptors(Acceptors, Mod, CState, Socket, Timeout),
+					start_acceptors(Acceptors, Parent, Mod, CState, Socket, Timeout),
 					{ok, #state{
 						callback = {Mod, CState},
 						socket = Socket
@@ -374,32 +402,41 @@ code_change(_, _, State) ->
 	{ok, State}.
 
 %% @private
-start_acceptors(0, _, _, _, _) ->
+start_acceptors(0, _, _, _, _, _) ->
 	ok;
-start_acceptors(Acceptors, Callback, CState, Socket, SSLTimeout) ->
-	Args = [self(), Callback, CState, Socket, SSLTimeout],
+start_acceptors(Acceptors, Parent, Callback, CState, Socket, SSLTimeout) ->
+	Args = [Parent, Callback, CState, Socket, SSLTimeout],
 	proc_lib:spawn(?MODULE, init_acceptor, Args),
-	start_acceptors(Acceptors - 1, Callback, CState, Socket, SSLTimeout).
+	start_acceptors(Acceptors - 1, Parent, Callback, CState, Socket, SSLTimeout).
 
 %% @hidden
--spec init_acceptor(pid(), atom(), term(), any(), timeout()) -> _.
+-spec init_acceptor(Parent, atom(), term(), any(), timeout()) -> any() when
+	Parent :: {prune, none} | none | {prune, pid()} | pid().
+init_acceptor({prune, none}, Callback, CState, Socket, SSLTimeout) ->
+	accept(none, Callback, CState, Socket, SSLTimeout);
+init_acceptor(none, Callback, CState, Socket, SSLTimeout) ->
+	accept(none, Callback, CState, Socket, SSLTimeout);
+init_acceptor({prune, Parent}, Callback, CState, Socket, SSLTimeout) ->
+	put('$ancestors', tl(get('$ancestors'))),
+	init_acceptor(Parent, Callback, CState, Socket, SSLTimeout);
 init_acceptor(Parent, Callback, CState, Socket, SSLTimeout) ->
 	try link(Parent)
 		catch error:noproc -> exit(normal)
 	end,
-	put('$ancestors', tl(get('$ancestors'))),
 	accept(Parent, Callback, CState, Socket, SSLTimeout).
 
 accept(Parent, Callback, CState, Socket, SSLTimeout) ->
 	case do_accept(Socket, SSLTimeout) of
 		{ok, Client} ->
-			Args = [Parent, Callback, CState, Socket, SSLTimeout],
+			Args = [{prune, Parent}, Callback, CState, Socket, SSLTimeout],
 			proc_lib:spawn(?MODULE, init_acceptor, Args),
 			Callback:handle_connection(Client, CState);
 		{error, {{ssl, ssl_accept}, timeout}} -> % SSL negotiation timed out
 			accept(Parent, Callback, CState, Socket, SSLTimeout);
-		{error, {_, closed}} ->
+		{error, {_, closed}} when Parent /= none ->
 			unlink(Parent), % no need to send exit signals here
+			exit(normal);
+		{error, {_, closed}} ->
 			exit(normal);
 		Other ->
 			erlang:error(Other)
@@ -434,9 +471,11 @@ sock_port({gen_tcp, Socket}) ->
 sock_port({Mod, Socket}) ->
 	element(2, Mod:port(Socket)).
 
-check_options([{socket_options, List} | T]) when is_list(List) ->
+check_options([{socket_options, L} | T]) when is_list(L) ->
 	check_options(T);
 check_options([{acceptors, N} | T]) when is_integer(N), N > 0 ->
+	check_options(T);
+check_options([{link_acceptors, B} | T]) when is_boolean(B) ->
 	check_options(T);
 check_options([{ssl_accept_timeout, infinity} | T]) ->
 	check_options(T);
@@ -451,7 +490,7 @@ module(tcp)  -> gen_tcp;
 module(Type) -> Type.
 
 %% @hidden
--spec behaviour_info(any()) -> [{atom(), non_neg_integer()}] | ok.
+-spec behaviour_info(any()) -> [{module(), non_neg_integer()}] | ok.
 behaviour_info(callbacks) ->
 	[{init, 1}, {handle_connection, 2}, {handle_info, 2}, {terminate, 2}];
 behaviour_info(_) ->
