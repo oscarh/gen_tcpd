@@ -120,6 +120,8 @@
 	setopts/2,
 	controlling_process/2,
 	type/1,
+	sock/1,
+	make_sock/2,
 	stop/1
 ]).
 -export([
@@ -274,7 +276,7 @@ sockname({Mod, Socket}) ->
 	Mod:sockname(Socket).
 
 %% @spec type(Socket::socket()) -> tcp | ssl
-%% @doc Returns the type of <code>Socket</code>. 
+%% @doc Returns the type of <code>Socket</code>.
 -spec type(gen_tcpd_socket()) -> tcp | ssl.
 type({gen_tcp, _}) ->
 	tcp;
@@ -282,6 +284,16 @@ type({ssl, _}) ->
 	ssl;
 type(A) ->
 	exit({badarg, A}).
+
+%% @spec sock(Socket::socket()) -> port()
+%% @doc Returns the underlying socket port of <code>Socket</code>.
+-spec sock(gen_tcpd_socket()) -> port().
+sock({_, Socket}) -> Socket.
+
+%% @spec make_sock(Socket::port()) -> socket()
+%% @doc Returns a gen_tcpd socket from socket port <code>Socket</code>.
+-spec make_sock(port()) -> gen_tcpd_socket().
+make_sock(Type, Socket) -> {module(Type), Socket}.
 
 %% @spec controlling_process(Socket::socket(), Pid::pid()) ->
 %%                                   ok | {error, Reason}
