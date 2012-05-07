@@ -140,7 +140,8 @@
 -record(state, {callback :: {module(), term()},
 		socket   :: gen_tcpd_socket()}).
 
--type state() :: #state{}.
+-type state()  :: #state{}.
+-type socket() :: port().
 
 %% @spec start_link(Callback, CallbackArg, Type, Port, Options) -> {ok, Pid}
 %% Callback = atom()
